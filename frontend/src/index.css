@@ -274,11 +274,32 @@ html, body, #root {
   animation: severity-flash 1s ease-in-out infinite;
 }
 .alert-entry {
-  animation: alert-slide-in 0.4s ease-out;
+  animation: alert-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes alert-slide-in {
-  from { transform: translateX(30px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from { transform: translateX(20px); opacity: 0; filter: blur(4px); }
+  to { transform: translateX(0); opacity: 1; filter: blur(0); }
+}
+
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(31, 44, 90, 0.8); border-radius: 2px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(34, 211, 238, 0.3); }
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.animate-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.animate-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  animation: shimmer 2s infinite;
 }
 
 /* ============================================================

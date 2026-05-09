@@ -88,9 +88,8 @@ function AlertBtn({ count }) {
 
   return (
     <button
-      className={`relative w-8 h-8 rounded-lg bg-bg-card/60 border border-bg-line flex items-center justify-center text-ink-2 hover:text-ink-1 transition ${
-        flash ? 'animate-shake' : ''
-      }`}
+      className={`relative w-8 h-8 rounded-lg bg-bg-card/60 border border-bg-line flex items-center justify-center text-ink-2 hover:text-ink-1 transition ${flash ? 'animate-shake' : ''
+        }`}
     >
       <Bell className="w-4 h-4" />
       {!!count && (
