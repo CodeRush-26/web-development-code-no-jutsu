@@ -1,0 +1,93 @@
+# ============================================
+# Maritime Ops — root .gitignore
+# ============================================
+
+# --- Dependencies ---
+node_modules/
+**/node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# --- Build output ---
+dist/
+build/
+out/
+**/dist/
+**/build/
+
+# --- Environment / secrets (NEVER commit) ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Keep example files committed
+!.env.example
+!**/.env.example
+
+# --- Logs ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Runtime / cache ---
+.cache/
+.parcel-cache/
+.vite/
+.turbo/
+.next/
+.nuxt/
+coverage/
+.nyc_output/
+*.pid
+*.seed
+*.pid.lock
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# --- OS ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# --- Docker ---
+.docker/
+
+# --- Misc ---
+*.tgz
+.eslintcache
+.stylelintcache
+.npm
+.yarn-integrity
+*.tsbuildinfo
+
+# --- Project-specific ---
+# Uploaded screenshots / template references not needed in repo
+frontend/template.png
+frontend/public/template.png
+
+# Local notes
+NOTES.md
+TODO.md
+*.local.md

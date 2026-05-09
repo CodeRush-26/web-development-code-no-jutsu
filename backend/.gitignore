@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+coverage/
+.nyc_output/
+
+# Build artifacts (none normally for backend, but just in case)
+dist/
+build/
+
+# Cache
+.cache/
+.eslintcache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
