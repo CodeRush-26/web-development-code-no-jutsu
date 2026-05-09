@@ -21,27 +21,28 @@ export default function CommandDashboard() {
   const selectedShipId = useFleetStore((s) => s.selectedShipId);
 
   return (
-    <div className="h-screen flex bg-bg-base text-ink-1">
+    <div className="h-screen flex bg-bg-base text-ink-1 overflow-hidden">
+      <div className="ocean-mesh" />
       <AlertSound />
       <Sidebar active={active} onChange={setActive} />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         <ConnectionBanner />
         <TopBar centerLabel="Command Center" />
 
-        <main id="dashboard-main" className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
+        <main id="dashboard-main" className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth custom-scrollbar">
           {/* Top stats — anchor: dashboard */}
-          <section id="section-top">
+          <section id="section-top" className="animate-reveal stagger-1">
             <StatCards />
           </section>
 
           {/* Map + side rail */}
-          <section id="section-map" className="grid grid-cols-[1fr_340px] gap-4">
-            <div className="card overflow-hidden h-[520px]">
+          <section id="section-map" className="grid grid-cols-[1fr_340px] gap-6 animate-reveal stagger-2">
+            <div className="card overflow-hidden h-[540px] border-glow-cyan">
               <FleetMap mode="command" />
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
               {selectedShipId ? <SelectedShipPanel /> : <SelectedPlaceholder />}
               <div id="section-alerts">
                 <RecentAlerts />
@@ -50,7 +51,7 @@ export default function CommandDashboard() {
           </section>
 
           {/* Fleet + Weather */}
-          <section className="grid grid-cols-2 gap-4">
+          <section className="grid grid-cols-2 gap-6 animate-reveal stagger-3">
             <FleetStatus />
             <div id="section-weather">
               <WeatherOverview />
@@ -58,7 +59,7 @@ export default function CommandDashboard() {
           </section>
 
           {/* AI + Directives */}
-          <section className="grid grid-cols-2 gap-4">
+          <section className="grid grid-cols-2 gap-6 animate-reveal stagger-4">
             <div id="section-ai">
               <AIDistressAnalysis />
             </div>
@@ -68,17 +69,17 @@ export default function CommandDashboard() {
           </section>
 
           {/* Ships table — what backend exposes via /api/ships and fleet:update */}
-          <section id="section-ships">
+          <section id="section-ships" className="animate-reveal stagger-5">
             <ShipsTable />
           </section>
 
           {/* Zones management */}
-          <section id="section-zones">
+          <section id="section-zones" className="animate-reveal">
             <ZonesPanel />
           </section>
 
           {/* Playback */}
-          <section id="section-playback">
+          <section id="section-playback" className="animate-reveal">
             <PlaybackTimeline />
           </section>
         </main>
