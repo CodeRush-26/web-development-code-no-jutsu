@@ -1,4 +1,4 @@
-import { isWalkable, cellToLngLat } from './grid.js';
+import { isWalkable, cellToLngLat, cellCost } from './grid.js';
 import * as turf from '@turf/turf';
 
 /**
@@ -108,7 +108,9 @@ export function findPath(grid, startCell, goalCell, { allowStartUnwalkable = fal
       if (!isWalkable(grid, nr, nc)) continue;
       const nIdx = nr * grid.cols + nc;
       if (closed.has(nIdx)) continue;
-      const tentativeG = (gScore.get(curIdx) ?? Infinity) + cost;
+      // Multiply base cost by cell's weather cost (1.0 = clear, 2.0 = adverse weather)
+      const weatherCost = cellCost(grid, nr, nc) || 1;
+      const tentativeG = (gScore.get(curIdx) ?? Infinity) + cost * weatherCost;
       if (tentativeG < (gScore.get(nIdx) ?? Infinity)) {
         cameFrom.set(nIdx, curIdx);
         gScore.set(nIdx, tentativeG);

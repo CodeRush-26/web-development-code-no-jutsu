@@ -38,7 +38,9 @@ export const env = {
   ADVERSE_WAVE_HEIGHT_M: num('ADVERSE_WAVE_HEIGHT_M', 2.5),
   ADVERSE_WIND_WAVE_HEIGHT_M: num('ADVERSE_WIND_WAVE_HEIGHT_M', 2.0),
 
-  BASE_FUEL_BURN_PER_KNOT_HOUR: num('BASE_FUEL_BURN_PER_KNOT_HOUR', 0.5),
+  // v³ fuel model: fuel_per_sec = FUEL_BURN_K × speed³ × cargoMultiplier × weatherMultiplier
+  // Tuned so Gharial (750t, 14kts) drains in ~15 min for dramatic demo
+  FUEL_BURN_K: num('FUEL_BURN_K', 0.0003),
   PROXIMITY_THRESHOLD_KM: num('PROXIMITY_THRESHOLD_KM', 2.0),
   ADVERSE_WEATHER_FUEL_MULTIPLIER: 1.30,
 

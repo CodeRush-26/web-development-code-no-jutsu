@@ -1,6 +1,8 @@
 import * as turf from '@turf/turf';
 import * as state from './state.js';
 import { planRoute } from '../routing/index.js';
+import { getGrid } from '../routing/index.js';
+import { applyWeatherOverlay } from '../routing/grid.js';
 import { createAlert } from '../services/alerts.js';
 import { getCachedWeather, refreshWeatherAsync } from '../services/weather.js';
 import { env } from '../config/env.js';
@@ -43,6 +45,22 @@ async function runTick() {
   // 3. weather refresh per ship (every 60 ticks ≈ 1 min)
   if (tickCount % 60 === 0) {
     for (const ship of allShips) refreshWeatherAsync(ship).catch(() => {});
+
+    // Apply weather overlay to routing grid so A* avoids bad weather
+    const grid = getGrid();
+    if (grid) {
+      const adversePositions = allShips
+        .filter((s) => s.inAdverseWeather)
+        .map((s) => s.position.coordinates);
+      if (adversePositions.length > 0) {
+        applyWeatherOverlay(grid, adversePositions);
+      }
+    }
+  }
+
+  // 3b. Predictive alerts (every 10 ticks ≈ 10s)
+  if (tickCount % 10 === 0) {
+    checkPredictiveAlerts(allShips, zonesArr);
   }
 
   // 4. broadcast
@@ -95,7 +113,7 @@ function advanceShip(ship, dtSec, zonesArr) {
           message: `${ship.name} fuel low — may not reach destination`
         });
       }
-    } else if (ship.status !== 'rerouting' && ship.status !== 'distressed') {
+    } else if (ship.status !== 'distressed') {
       ship.status = 'normal';
     }
   }
@@ -120,11 +138,15 @@ function advanceShip(ship, dtSec, zonesArr) {
     ship.heading = (headingDeg + 360) % 360;
   }
 
-  // fuel burn (30% extra in adverse weather)
-  const hours = dtSec / 3600;
-  const baseBurn = ship.speed * env.BASE_FUEL_BURN_PER_KNOT_HOUR * hours;
-  const burn = baseBurn * (ship.inAdverseWeather ? env.ADVERSE_WEATHER_FUEL_MULTIPLIER : 1);
+  // v³ fuel model: fuel_per_sec = k × speed³ × cargoMultiplier × weatherMultiplier
+  // Realistic: doubling speed → 8x fuel consumption
+  const v = ship.speed;
+  const baseBurn = env.FUEL_BURN_K * v * v * v * dtSec;
+  const cargoMul = ship.cargoMultiplier || 1.0;
+  const weatherMul = ship.inAdverseWeather ? env.ADVERSE_WEATHER_FUEL_MULTIPLIER : 1.0;
+  const burn = baseBurn * cargoMul * weatherMul;
   ship.fuel = Math.max(0, ship.fuel - burn);
+  ship.fuelBurnRate = burn / dtSec; // t/s for frontend display
 
   if (ship.fuel === 0) {
     ship.status = 'out_of_fuel';
@@ -212,7 +234,101 @@ function checkProximity(allShips) {
   }
 }
 
+/**
+ * Predictive alerts: fire warnings BEFORE things go wrong.
+ * - Fuel shortage: "Ship will run out of fuel X km short of port"
+ * - Zone entry: "Ship will enter zone in ~N minutes"
+ */
+function checkPredictiveAlerts(allShips, zonesArr) {
+  for (const ship of allShips) {
+    if (['arrived', 'out_of_fuel', 'stopped', 'stranded'].includes(ship.status)) continue;
+
+    // Predictive fuel alert
+    if (ship.destination?.coordinates && ship.speed > 0) {
+      const result = planRoute(ship);
+      if (result.path && !result.sufficientFuel) {
+        const shortfallTons = result.fuelEstimate - ship.fuel;
+        const key = `predict-fuel:${ship.shipId}`;
+        if (!state.activeAlertKeys.has(key)) {
+          state.activeAlertKeys.add(key);
+          const distLeft = result.distanceKm;
+          const fuelRange = (ship.fuel / result.fuelEstimate) * distLeft;
+          const shortKm = Math.max(0, distLeft - fuelRange).toFixed(0);
+          createAlert({
+            type: 'predictive_fuel',
+            severity: 'medium',
+            shipIds: [ship.shipId],
+            message: `⚠ Predictive: ${ship.name} will run out of fuel ~${shortKm} km short of ${ship.destination.portName || 'port'}. Shortfall: ${shortfallTons.toFixed(0)}t`
+          });
+        }
+      } else {
+        // Clear prediction if fuel is now sufficient
+        state.activeAlertKeys.delete(`predict-fuel:${ship.shipId}`);
+      }
+    }
+
+    // Predictive zone entry alert
+    if (ship.currentPath?.length > 0 && ship.speed > 0) {
+      for (const z of zonesArr) {
+        const zoneKey = `predict-zone:${ship.shipId}:${z.zoneId}`;
+        if (state.activeAlertKeys.has(`geofence:${ship.shipId}:${z.zoneId}`)) continue; // already inside
+        if (state.activeAlertKeys.has(zoneKey)) continue; // already warned
+
+        // Check if any upcoming waypoint falls inside this zone
+        const idx = ship.pathIndex || 0;
+        for (let i = idx; i < Math.min(idx + 5, ship.currentPath.length); i++) {
+          try {
+            const inside = turf.booleanPointInPolygon(
+              turf.point(ship.currentPath[i]),
+              turf.polygon(z.geometry.coordinates)
+            );
+            if (inside) {
+              const distToWp = turf.distance(
+                turf.point(ship.position.coordinates),
+                turf.point(ship.currentPath[i]),
+                { units: 'kilometers' }
+              );
+              const speedKmh = ship.speed * 1.852;
+              const minutesToEntry = Math.round((distToWp / speedKmh) * 60);
+              if (minutesToEntry <= 10) {
+                state.activeAlertKeys.add(zoneKey);
+                createAlert({
+                  type: 'predictive_zone',
+                  severity: 'medium',
+                  shipIds: [ship.shipId],
+                  zoneId: z.zoneId,
+                  message: `⚠ Predictive: ${ship.name} will enter ${z.name} in ~${minutesToEntry} min`
+                });
+              }
+              break;
+            }
+          } catch { /* skip malformed zone */ }
+        }
+      }
+    }
+  }
+}
+
 function serializeShip(s) {
+  // Compute fuel estimate for frontend display
+  let fuelEstimate = null;
+  let fuelShortfall = null;
+  if (s.destination?.coordinates && s.speed > 0 && s.currentPath?.length > 0) {
+    let distKm = 0;
+    const coords = [s.position.coordinates, ...(s.currentPath || []).slice(s.pathIndex || 0)];
+    for (let i = 1; i < coords.length; i++) {
+      distKm += turf.distance(turf.point(coords[i - 1]), turf.point(coords[i]), { units: 'kilometers' });
+    }
+    const speedKmH = s.speed * 1.852;
+    const seconds = (distKm / speedKmH) * 3600;
+    const v = s.speed;
+    const baseBurn = env.FUEL_BURN_K * v * v * v * seconds;
+    const cargoMul = s.cargoMultiplier || 1.0;
+    const weatherMul = s.inAdverseWeather ? env.ADVERSE_WEATHER_FUEL_MULTIPLIER : 1.0;
+    fuelEstimate = baseBurn * cargoMul * weatherMul;
+    fuelShortfall = fuelEstimate > s.fuel ? fuelEstimate - s.fuel : 0;
+  }
+
   return {
     shipId: s.shipId,
     name: s.name,
@@ -229,7 +345,11 @@ function serializeShip(s) {
     destination: s.destination,
     fuel: Number((s.fuel ?? 0).toFixed(1)),
     fuelCapacity: s.fuelCapacity,
+    fuelEstimate: fuelEstimate !== null ? Number(fuelEstimate.toFixed(1)) : null,
+    fuelShortfall: fuelShortfall !== null ? Number(fuelShortfall.toFixed(1)) : null,
+    fuelBurnRate: Number((s.fuelBurnRate ?? 0).toFixed(2)),
     cargo: s.cargo,
+    cargoMultiplier: s.cargoMultiplier || 1.0,
     status: s.status,
     inAdverseWeather: s.inAdverseWeather,
     currentPath: s.currentPath || []

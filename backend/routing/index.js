@@ -100,9 +100,15 @@ export function planRoute(ship, opts = {}) {
 
 function computeFuelEstimate(ship, distanceKm) {
   if (!ship.speed || ship.speed <= 0) return 0;
-  const hours = distanceKm / (ship.speed * 1.852);
-  const baseBurn = hours * ship.speed * env.BASE_FUEL_BURN_PER_KNOT_HOUR;
-  return baseBurn * (ship.inAdverseWeather ? env.ADVERSE_WEATHER_FUEL_MULTIPLIER : 1);
+  const speedKmH = ship.speed * 1.852;
+  const hours = distanceKm / speedKmH;
+  const seconds = hours * 3600;
+  // v³ model matching tick.js: k × speed³ × seconds × cargoMul × weatherMul
+  const v = ship.speed;
+  const baseBurn = env.FUEL_BURN_K * v * v * v * seconds;
+  const cargoMul = ship.cargoMultiplier || 1.0;
+  const weatherMul = ship.inAdverseWeather ? env.ADVERSE_WEATHER_FUEL_MULTIPLIER : 1.0;
+  return baseBurn * cargoMul * weatherMul;
 }
 
 /**

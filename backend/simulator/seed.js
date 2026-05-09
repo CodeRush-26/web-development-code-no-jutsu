@@ -58,6 +58,19 @@ export async function getFleetConfig() {
 }
 
 /**
+ * Cargo weight multiplier for fuel consumption.
+ * Heavier/denser cargo → more fuel burned.
+ */
+const CARGO_FUEL_MULTIPLIER = {
+  'crude oil': 1.30,      // very heavy liquid
+  'LNG': 1.20,            // pressurized gas
+  'containers': 1.10,     // variable weight
+  'bulk grain': 1.15,     // dense bulk
+  'bulk cement': 1.20,    // heavy bulk
+  'automobiles': 1.05     // lighter cargo
+};
+
+/**
  * Build the initial fleet of 15 ship objects (in-memory shape).
  */
 export async function buildInitialShips() {
@@ -76,6 +89,7 @@ export async function buildInitialShips() {
       fuel: s.fuel,
       fuelCapacity: Math.max(s.fuel * 1.5, 10000),
       cargo: s.cargo,
+      cargoMultiplier: CARGO_FUEL_MULTIPLIER[s.cargo] || 1.0,
       status: s.status || 'normal',
       currentPath: [],
       pathIndex: 0,

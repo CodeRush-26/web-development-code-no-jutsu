@@ -92,6 +92,23 @@ export default function SelectedShipPanel() {
         </div>
       )}
 
+      {/* Fuel sufficiency indicator */}
+      {ship.fuelShortfall > 0 ? (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/40">
+          <AlertTriangle className="w-4 h-4 text-red-400" />
+          <span className="text-xs font-semibold text-red-400">
+            ⚠ Insufficient fuel — {ship.fuelShortfall.toFixed(0)}t short of destination
+          </span>
+        </div>
+      ) : ship.fuelEstimate !== null && ship.fuelEstimate !== undefined ? (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/40">
+          <Activity className="w-4 h-4 text-emerald-400" />
+          <span className="text-xs font-semibold text-emerald-400">
+            ✓ Can reach destination ({ship.fuelEstimate?.toFixed(0)}t needed)
+          </span>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-3 text-sm">
         <Mini icon={Navigation} label="Speed" value={`${(ship.speed || 0).toFixed(1)} kts`} />
         <Mini icon={Activity} label="Heading" value={`${Math.round(ship.heading || 0)}°`} />
@@ -137,6 +154,19 @@ export default function SelectedShipPanel() {
           }
         />
         <Row label="Cargo" value={ship.cargo || '—'} />
+        {ship.cargoMultiplier && ship.cargoMultiplier !== 1 && (
+          <Row label="Cargo weight" value={`×${ship.cargoMultiplier.toFixed(2)} fuel penalty`} />
+        )}
+        {ship.fuelBurnRate > 0 && (
+          <Row
+            label="Burn rate"
+            value={
+              <span className="text-accent-amber font-mono">
+                {ship.fuelBurnRate.toFixed(2)} t/s
+              </span>
+            }
+          />
+        )}
         <Row
           label="Path waypoints"
           value={ship.currentPath?.length ? `${ship.currentPath.length}` : '—'}
