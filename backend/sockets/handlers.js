@@ -24,6 +24,7 @@ export function registerHandlers(io, socket) {
     };
     state.setZone(zone);
     routing.rebuildForZones(state.allZones());
+    console.log(`✓ Zone "${zone.name}" created — ${state.allZones().length} total zones. Rebuilding grid & replanning all ships...`);
     invalidateShipPaths();
 
     io.to('fleet').emit('zone:update', { action: 'create', zone });
