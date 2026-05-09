@@ -39,8 +39,9 @@ export const env = {
   ADVERSE_WIND_WAVE_HEIGHT_M: num('ADVERSE_WIND_WAVE_HEIGHT_M', 2.0),
 
   // v³ fuel model: fuel_per_sec = FUEL_BURN_K × speed³ × cargoMultiplier × weatherMultiplier
-  // Tuned so Gharial (750t, 14kts) drains in ~15 min for dramatic demo
-  FUEL_BURN_K: num('FUEL_BURN_K', 0.0003),
+  // At 0.00001: 14kts burns 0.027 t/s → Gharial (750t) drains in ~7.6 hrs (drama for 8-hr hackathon)
+  //             19kts burns 0.069 t/s → Halcyon (5200t) shows ~338t shortfall on 789km route (realistic crisis)
+  FUEL_BURN_K: num('FUEL_BURN_K', 0.00001),
   PROXIMITY_THRESHOLD_KM: num('PROXIMITY_THRESHOLD_KM', 2.0),
   ADVERSE_WEATHER_FUEL_MULTIPLIER: 1.30,
 

@@ -56,4 +56,28 @@ router.get('/fleet-config', (req, res) => {
   });
 });
 
+/**
+ * POST /api/fleet/reset
+ * Refuels all ships to full capacity and resets status to 'normal'.
+ * Use for hackathon demos after a long simulation run.
+ */
+router.post('/fleet/reset', (req, res) => {
+  const ships = state.allShips();
+  for (const ship of ships) {
+    state.setShip(ship.shipId, {
+      fuel: ship.fuelCapacity,
+      status: 'normal',
+      speed: ship.maxSpeed || 14,
+      currentPath: [],
+      pathIndex: 0
+    });
+  }
+  for (const key of [...state.activeAlertKeys]) {
+    if (key.startsWith('fuel:') || key.startsWith('predict-fuel:') || key.startsWith('stranded:')) {
+      state.activeAlertKeys.delete(key);
+    }
+  }
+  res.json({ ok: true, ships: ships.length, message: 'Fleet refueled and reset to normal' });
+});
+
 export default router;

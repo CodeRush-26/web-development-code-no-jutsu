@@ -1,6 +1,6 @@
 import * as turf from '@turf/turf';
 
-const CELL_SIZE_KM = 10; // ~10km cells — coarser keeps A* fast for hackathon over the whole Gulf region
+const CELL_SIZE_KM = 5; // ~5km cells — fine enough to navigate the Strait of Hormuz channel
 const WEATHER_COST_MULTIPLIER = 2.0; // cells with adverse weather cost 2x more to traverse
 
 /**

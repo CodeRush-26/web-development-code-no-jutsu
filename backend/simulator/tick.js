@@ -269,7 +269,20 @@ function checkGeofences(allShips, zonesArr) {
   }
 }
 
+// Tracks last alert timestamp per ship pair to enforce 30-second re-alert cooldown.
+// Map<pairKey, lastAlertMs>
+const proximityCooldown = new Map();
+const PROXIMITY_COOLDOWN_MS = 30_000;
+
+/**
+ * Check all N*(N-1)/2 ship pairs for proximity breaches.
+ * - Alert fires within 1 tick of breach
+ * - Each pair triggers its own independent alert (3 ships → 3 pair alerts)
+ * - Same pair re-alerts at most once per 30 seconds (handles oscillation at boundary)
+ * - Alert clears when ships move beyond PROXIMITY_THRESHOLD_KM
+ */
 function checkProximity(allShips) {
+  const now = Date.now();
   for (let i = 0; i < allShips.length; i++) {
     for (let j = i + 1; j < allShips.length; j++) {
       const a = allShips[i];
@@ -279,17 +292,30 @@ function checkProximity(allShips) {
         turf.point(b.position.coordinates),
         { units: 'kilometers' }
       );
+      // Canonical key so MV-1:MV-2 and MV-2:MV-1 are the same pair
       const key = `proximity:${[a.shipId, b.shipId].sort().join(':')}`;
-      if (km < env.PROXIMITY_THRESHOLD_KM && !state.activeAlertKeys.has(key)) {
-        state.activeAlertKeys.add(key);
-        createAlert({
-          type: 'proximity',
-          severity: 'medium',
-          shipIds: [a.shipId, b.shipId],
-          message: `${a.name} ↔ ${b.name} within ${km.toFixed(2)}km`
-        });
-      } else if (km >= env.PROXIMITY_THRESHOLD_KM && state.activeAlertKeys.has(key)) {
-        state.activeAlertKeys.delete(key);
+
+      if (km < env.PROXIMITY_THRESHOLD_KM) {
+        const lastFired = proximityCooldown.get(key) ?? 0;
+        const cooldownExpired = (now - lastFired) >= PROXIMITY_COOLDOWN_MS;
+
+        // Fire if: (a) not currently active (ships just entered range), OR
+        //          (b) cooldown expired (ships oscillated: went apart, came back)
+        if (!state.activeAlertKeys.has(key) && cooldownExpired) {
+          state.activeAlertKeys.add(key);
+          proximityCooldown.set(key, now);
+          createAlert({
+            type: 'proximity',
+            severity: 'medium',
+            shipIds: [a.shipId, b.shipId],
+            message: `⚠ ${a.name} (${a.shipId}) ↔ ${b.name} (${b.shipId}) — ${km.toFixed(2)} km apart (threshold: ${env.PROXIMITY_THRESHOLD_KM} km)`
+          });
+        }
+      } else {
+        // Ships moved beyond threshold — clear active flag so next approach re-alerts
+        if (state.activeAlertKeys.has(key)) {
+          state.activeAlertKeys.delete(key);
+        }
       }
     }
   }

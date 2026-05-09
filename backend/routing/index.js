@@ -111,39 +111,59 @@ function computeFuelEstimate(ship, distanceKm) {
   return baseBurn * cargoMul * weatherMul;
 }
 
+// Pre-defined corridor waypoints through the Strait of Hormuz and Gulf of Oman.
+// Ships use these as stepping stones when A* cannot find a full grid path.
+// All coords are [lng, lat] (GeoJSON order).
+const HORMUZ_WEST = [56.10, 26.55]; // Persian Gulf side of strait
+const HORMUZ_EAST = [56.80, 26.30]; // Gulf of Oman side of strait
+const GULF_OMAN_MID = [57.80, 25.50]; // Open water, central Gulf of Oman
+const PERSIAN_GULF_MID = [54.50, 26.00]; // Open water, central Persian Gulf
+
+// Longitude threshold separating Persian Gulf from Gulf of Oman
+const HORMUZ_LNG = 56.5;
+
 /**
- * Naive fallback: a single waypoint going directly to the destination, but if the
- * straight line crosses an active zone we add a deflection point that sidesteps it.
- * Spec: "naive head toward destination and deflect when blocked" is explicitly allowed.
+ * Corridor fallback: routes ships through the Hormuz strait using pre-defined
+ * waypoints when A* fails, so ships always follow a geographically plausible path.
  */
 function computeDirectFallback(ship, opts = {}) {
   if (!gridCache) return null;
-  const start = ship.position.coordinates;
+  const start = ship.position.coordinates; // [lng, lat]
   const goal = ship.destination.coordinates;
-  const line = turf.lineString([start, goal]);
 
-  const blockingZones = (gridCache.zones || []).filter((z) => {
-    try {
-      return turf.booleanIntersects(line, turf.polygon(z.geometry.coordinates));
-    } catch {
-      return false;
-    }
-  });
+  const startInGulf = start[0] < HORMUZ_LNG;
+  const goalInGulf  = goal[0]  < HORMUZ_LNG;
 
-  if (!blockingZones.length || opts.shipInsideZone) {
-    return [start.slice(), goal.slice()];
+  let waypoints;
+  if (startInGulf && !goalInGulf) {
+    // Persian Gulf → Gulf of Oman: go through strait west→east
+    waypoints = [start.slice(), PERSIAN_GULF_MID, HORMUZ_WEST, HORMUZ_EAST, GULF_OMAN_MID, goal.slice()];
+  } else if (!startInGulf && goalInGulf) {
+    // Gulf of Oman → Persian Gulf: go through strait east→west
+    waypoints = [start.slice(), GULF_OMAN_MID, HORMUZ_EAST, HORMUZ_WEST, PERSIAN_GULF_MID, goal.slice()];
+  } else {
+    // Same side — direct within-gulf route, but deflect around zones
+    waypoints = [start.slice(), goal.slice()];
   }
 
-  // Pick the first blocking zone, deflect around its centroid + perpendicular offset
-  const zonePoly = turf.polygon(blockingZones[0].geometry.coordinates);
-  const centroid = turf.centroid(zonePoly).geometry.coordinates;
-  const bbox = turf.bbox(zonePoly);
-  const radius = Math.max(bbox[2] - bbox[0], bbox[3] - bbox[1]);
-  // perpendicular offset (rotate 90° relative to direct bearing)
-  const bearing = turf.bearing(turf.point(start), turf.point(goal));
-  const perpA = (bearing + 90) % 360;
-  const offset = turf.destination(turf.point(centroid), radius * 80, perpA, {
-    units: 'kilometers'
-  }).geometry.coordinates;
-  return [start.slice(), offset, goal.slice()];
+  // Deflect around any active user-drawn zones that block the path
+  if (!opts.shipInsideZone) {
+    const zones = gridCache.zones || [];
+    for (const z of zones) {
+      try {
+        const line = turf.lineString(waypoints);
+        if (turf.booleanIntersects(line, turf.polygon(z.geometry.coordinates))) {
+          const centroid = turf.centroid(turf.polygon(z.geometry.coordinates)).geometry.coordinates;
+          const bearing = turf.bearing(turf.point(start), turf.point(goal));
+          const offset = turf.destination(turf.point(centroid), 80, (bearing + 90) % 360, {
+            units: 'kilometers'
+          }).geometry.coordinates;
+          waypoints.splice(1, 0, offset);
+          break;
+        }
+      } catch { /* skip malformed zone */ }
+    }
+  }
+
+  return waypoints;
 }
