@@ -48,7 +48,7 @@ Open-Meteo (weather) and OpenStreetMap (basemap) need no keys.
 |---|---|
 | Exactly 15 active ships | ✅ from fleet.json |
 | 1 Hz tick rate | ✅ |
-| ≤ 500ms propagation (95p) | ✅ measured ~3ms locally |
+| ≤ 500ms propagation (95p) | ✅ |
 | Geofence breach alert ≤ 1s | ✅ |
 | 2 km proximity threshold | ✅ |
 | 30% extra fuel adverse weather | ✅ |
@@ -74,7 +74,7 @@ Open-Meteo (weather) and OpenStreetMap (basemap) need no keys.
 - `fleet.json` provides `[lat, lng]`. We store GeoJSON `[lng, lat]`.
 - **Fuel units:** tons (per fleet.json).
 - **Adverse weather:** wave_height > 2.5m OR wind_wave_height > 2.0m.
-- **Routing:** A* on 10km grid + LOS smoothing; naive direct fallback (spec allows naive routing).
+- **Routing:** A* on a 3 km grid with line-of-sight smoothing that does both cell-level walkability AND sub-cell polygon containment, so smoothed paths never cut across peninsulas. Unwalkable start and goal cells (ports/ship-starts that sit just outside the simplified polygon) snap to the nearest navigable cell. Hormuz-corridor fallback is validated against the polygon and refused when any segment would cross land — the ship is then marked stranded per spec.
 - **Arrival threshold:** < 1.0 km from destination port.
 - **Proximity threshold:** 2.0 km exactly (spec).
 - **AI:** Groq `llama-3.3-70b-versatile`, 10s timeout, fallback severity:high.

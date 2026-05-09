@@ -52,14 +52,23 @@ export function registerHandlers(io, socket) {
   socket.on('zone:delete', ({ zoneId } = {}) => {
     if (socket.data.role !== 'command') return forbidden(socket);
     if (!zoneId) return forbidden(socket, 'invalid_payload');
+
+    // Auto-resolve every alert that was caused by this zone before we tear it
+    // down — otherwise the geofence/stranded entries linger in operator UIs.
+    for (const alert of state.activeAlerts()) {
+      if (alert.type === 'geofence' && alert.zoneId === zoneId) {
+        resolveAlert(alert.alertId);
+      } else if (alert.type === 'stranded') {
+        resolveAlert(alert.alertId);
+      }
+    }
+
     state.removeZone(zoneId);
     routing.rebuildForZones(state.allZones());
-    // Un-strand ships that were stranded by this zone
     for (const ship of state.allShips()) {
       if (ship.status === 'stranded') {
         state.activeAlertKeys.delete(`stranded:${ship.shipId}`);
         ship.status = 'rerouting';
-        // Restore speed from fleet data (ships were stopped when stranded)
         if (ship.speed === 0 && ship.maxSpeed) ship.speed = ship.maxSpeed * 0.6;
       }
     }
@@ -88,7 +97,9 @@ export function registerHandlers(io, socket) {
       distressMessage: null
     };
     state.addDirective(directive);
-    io.to(`ship:${shipId}`).emit('directive:incoming', directive);
+    // Both the targeted captain AND every Command operator need a copy so the
+    // Command "Directives" panel can show pending/accepted/escalated state.
+    io.to(`ship:${shipId}`).to('command').emit('directive:incoming', directive);
     socket.emit('directive:sent', { directiveId: directive.directiveId });
   });
 

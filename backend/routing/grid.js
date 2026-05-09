@@ -1,6 +1,6 @@
 import * as turf from '@turf/turf';
 
-const CELL_SIZE_KM = 5; // ~5km cells — fine enough to navigate the Strait of Hormuz channel
+const CELL_SIZE_KM = 3; // 3 km cells: ~13 cells across the Strait of Hormuz so paths track the channel cleanly
 const WEATHER_COST_MULTIPLIER = 2.0; // cells with adverse weather cost 2x more to traverse
 
 /**
@@ -77,30 +77,39 @@ export function buildGrid(navigablePolygon, zones, cellSizeKm = CELL_SIZE_KM) {
 
 /**
  * Apply weather overlay: for each ship with adverse weather, mark cells
- * within ~30km radius of that ship as having weather penalty cost.
- * Called periodically when weather data refreshes.
+ * within ~30km radius as having weather-penalty cost. Called periodically
+ * when weather data refreshes.
+ *
+ * Why the per-grid `_weatherOverlay` map: a previous version blanket-reset
+ * every walkable cell back to 1.0 before reapplying penalties, which silently
+ * erased storm-zone costs (5.0) that buildGrid() set. We now only restore the
+ * cells we ourselves penalized last time.
  */
 export function applyWeatherOverlay(grid, adverseShipPositions) {
-  // Reset all walkable cells to base cost 1.0
-  for (let i = 0; i < grid.cells.length; i++) {
-    if (grid.cells[i] > 0) grid.cells[i] = 1.0;
+  if (grid._weatherOverlay) {
+    for (const [idx, origCost] of grid._weatherOverlay) {
+      grid.cells[idx] = origCost;
+    }
   }
+  grid._weatherOverlay = new Map();
 
-  // For each adverse weather position, penalize nearby cells
-  const radiusCells = Math.ceil(30 / grid.cellSizeKm); // ~30km weather radius
+  const radiusCells = Math.ceil(30 / grid.cellSizeKm);
   for (const [lng, lat] of adverseShipPositions) {
     const centerC = Math.floor((lng - grid.minLng) / grid.lngStep);
     const centerR = Math.floor((lat - grid.minLat) / grid.latStep);
 
     for (let dr = -radiusCells; dr <= radiusCells; dr++) {
       for (let dc = -radiusCells; dc <= radiusCells; dc++) {
-        if (dr * dr + dc * dc > radiusCells * radiusCells) continue; // circular
+        if (dr * dr + dc * dc > radiusCells * radiusCells) continue;
         const r = centerR + dr;
         const c = centerC + dc;
         if (r < 0 || r >= grid.rows || c < 0 || c >= grid.cols) continue;
         const idx = r * grid.cols + c;
-        if (grid.cells[idx] > 0) {
-          grid.cells[idx] = Math.max(grid.cells[idx], WEATHER_COST_MULTIPLIER);
+        const cur = grid.cells[idx];
+        // Penalize only ordinary navigable cells; skip blocked (0) and storm zones (>=5)
+        if (cur > 0 && cur < WEATHER_COST_MULTIPLIER) {
+          if (!grid._weatherOverlay.has(idx)) grid._weatherOverlay.set(idx, cur);
+          grid.cells[idx] = WEATHER_COST_MULTIPLIER;
         }
       }
     }

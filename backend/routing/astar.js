@@ -66,15 +66,28 @@ const NEIGHBORS = [
  * `allowStartUnwalkable`: when ship starts inside a zone, treat the start cell as walkable.
  */
 export function findPath(grid, startCell, goalCell, { allowStartUnwalkable = false } = {}) {
+  if (!allowStartUnwalkable && !isWalkable(grid, startCell.r, startCell.c)) return null;
+
+  // Goal-cell snapping: many ports sit right on the simplified polygon boundary.
+  // If the goal cell is blocked but no zone covers it, snap to the nearest
+  // navigable cell so A* always has somewhere to head. Zone-blocked goals stay
+  // null — that's the spec's "stranded" case.
+  if (!isWalkable(grid, goalCell.r, goalCell.c)) {
+    const cost = grid.cells[goalCell.r * grid.cols + goalCell.c];
+    const blockedByZone = cost === 0 && (grid.zones || []).some((z) => {
+      try {
+        const [lng, lat] = cellToLngLat(grid, goalCell.r, goalCell.c);
+        return turf.booleanPointInPolygon(turf.point([lng, lat]), turf.polygon(z.geometry.coordinates));
+      } catch { return false; }
+    });
+    if (blockedByZone) return null;
+    const snapped = nearestWalkable(grid, goalCell.r, goalCell.c, 8);
+    if (!snapped) return null;
+    goalCell = snapped;
+  }
+
   const startIdx = startCell.r * grid.cols + startCell.c;
   const goalIdx = goalCell.r * grid.cols + goalCell.c;
-
-  if (!allowStartUnwalkable && !isWalkable(grid, startCell.r, startCell.c)) return null;
-  if (!isWalkable(grid, goalCell.r, goalCell.c)) {
-    // Goal is blocked. If it's inside a zone, return null (ship is stranded).
-    // Only snap for edge-of-map cases, not zone blocks.
-    return null;
-  }
 
   const open = new PriorityQueue();
   const cameFrom = new Map();

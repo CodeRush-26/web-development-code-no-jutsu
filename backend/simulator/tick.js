@@ -147,12 +147,13 @@ function advanceShip(ship, dtSec, zonesArr) {
     ship.currentPath = planned.path;
     ship.pathIndex = 0;
     
-    // Immediate fuel viability check
-    const fuelKey = `fuel:${ship.shipId}`;
+    // Distinct keys for the two fuel-related alerts so a prior 'insufficient_fuel'
+    // doesn't suppress the later 'out_of_fuel' critical when fuel hits zero.
+    const lowKey = `fuel-low:${ship.shipId}`;
     if (!planned.sufficientFuel) {
       ship.status = 'insufficient_fuel';
-      if (!state.activeAlertKeys.has(fuelKey)) {
-        state.activeAlertKeys.add(fuelKey);
+      if (!state.activeAlertKeys.has(lowKey)) {
+        state.activeAlertKeys.add(lowKey);
         createAlert({
           type: 'insufficient_fuel',
           severity: 'medium',
@@ -161,9 +162,8 @@ function advanceShip(ship, dtSec, zonesArr) {
         });
       }
     } else {
-      // Clear insufficient_fuel if now sufficient (e.g. rerouted or refueled)
       if (ship.status === 'insufficient_fuel') ship.status = 'normal';
-      state.activeAlertKeys.delete(fuelKey);
+      state.activeAlertKeys.delete(lowKey);
     }
   }
 
@@ -206,9 +206,9 @@ function advanceShip(ship, dtSec, zonesArr) {
   if (ship.fuel === 0) {
     ship.status = 'out_of_fuel';
     ship.speed = 0;
-    const key = `fuel:${ship.shipId}`;
-    if (!state.activeAlertKeys.has(key)) {
-      state.activeAlertKeys.add(key);
+    const outKey = `fuel-out:${ship.shipId}`;
+    if (!state.activeAlertKeys.has(outKey)) {
+      state.activeAlertKeys.add(outKey);
       createAlert({
         type: 'out_of_fuel',
         severity: 'critical',
@@ -400,10 +400,13 @@ function checkPredictiveAlerts(allShips, zonesArr) {
     if (ship.currentPath?.length > 0 && ship.speed > 0) {
       for (const z of zonesArr) {
         const zoneKey = `predict-zone:${ship.shipId}:${z.zoneId}`;
-        if (state.activeAlertKeys.has(`geofence:${ship.shipId}:${z.zoneId}`)) continue; // already inside
-        if (state.activeAlertKeys.has(zoneKey)) continue; // already warned
+        // Already inside the zone — geofence handles it; just clear any stale predict key
+        if (state.activeAlertKeys.has(`geofence:${ship.shipId}:${z.zoneId}`)) {
+          state.activeAlertKeys.delete(zoneKey);
+          continue;
+        }
 
-        // Check if any upcoming waypoint falls inside this zone
+        let willEnter = null;
         const idx = ship.pathIndex || 0;
         for (let i = idx; i < Math.min(idx + 5, ship.currentPath.length); i++) {
           try {
@@ -419,20 +422,25 @@ function checkPredictiveAlerts(allShips, zonesArr) {
               );
               const speedKmh = ship.speed * 1.852;
               const minutesToEntry = Math.round((distToWp / speedKmh) * 60);
-              // Only alert if entry is imminent (within 5 mins or 5km)
-              if (minutesToEntry <= 5 || distToWp <= 5) {
-                state.activeAlertKeys.add(zoneKey);
-                createAlert({
-                  type: 'predictive_zone',
-                  severity: 'medium',
-                  shipIds: [ship.shipId],
-                  zoneId: z.zoneId,
-                  message: `⚠ Predictive: ${ship.name} will enter ${z.name} in ~${minutesToEntry} min`
-                });
-              }
+              willEnter = { minutesToEntry, distToWp };
               break;
             }
           } catch { /* skip malformed zone */ }
+        }
+
+        const isImminent = willEnter && (willEnter.minutesToEntry <= 5 || willEnter.distToWp <= 5);
+        if (isImminent && !state.activeAlertKeys.has(zoneKey)) {
+          state.activeAlertKeys.add(zoneKey);
+          createAlert({
+            type: 'predictive_zone',
+            severity: 'medium',
+            shipIds: [ship.shipId],
+            zoneId: z.zoneId,
+            message: `⚠ Predictive: ${ship.name} will enter ${z.name} in ~${willEnter.minutesToEntry} min`
+          });
+        } else if (!willEnter && state.activeAlertKeys.has(zoneKey)) {
+          // Path no longer crosses this zone — drop the key so a future approach re-alerts
+          state.activeAlertKeys.delete(zoneKey);
         }
       }
     }

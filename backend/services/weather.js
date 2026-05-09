@@ -4,7 +4,8 @@ import { env } from '../config/env.js';
  * Open-Meteo Marine API — free, keyless.
  * Cached per ship for WEATHER_CACHE_MS.
  */
-const cache = new Map(); // shipId -> { conditions, fetchedAt }
+const cache = new Map();        // shipId -> { conditions, fetchedAt }
+const inFlight = new Set();     // dedup concurrent fetches without poisoning cache
 let io = null;
 
 export function setIo(socketServer) {
@@ -18,11 +19,10 @@ export function getCachedWeather(shipId) {
 export async function refreshWeatherAsync(ship) {
   const cached = cache.get(ship.shipId);
   if (cached && Date.now() - cached.fetchedAt < env.WEATHER_CACHE_MS) return;
+  if (inFlight.has(ship.shipId)) return;
+  inFlight.add(ship.shipId);
 
   const [lng, lat] = ship.position.coordinates;
-
-  // mark in-flight to prevent duplicate calls (cheap fingerprint)
-  cache.set(ship.shipId, { conditions: cached?.conditions, fetchedAt: Date.now() });
 
   try {
     const url =
@@ -51,10 +51,12 @@ export async function refreshWeatherAsync(ship) {
     cache.set(ship.shipId, { conditions, fetchedAt: Date.now() });
     if (io) io.to('fleet').emit('weather:update', { shipId: ship.shipId, conditions });
   } catch (err) {
-    // soft fail — keep last cached value
+    // soft fail — leave any prior cached value untouched so the next call retries
     if (env.NODE_ENV !== 'production') {
       console.warn(`weather fetch failed for ${ship.shipId}:`, err.message);
     }
+  } finally {
+    inFlight.delete(ship.shipId);
   }
 }
 

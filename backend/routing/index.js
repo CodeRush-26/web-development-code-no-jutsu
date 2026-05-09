@@ -34,15 +34,20 @@ export function planRoute(ship, opts = {}) {
   const [shipLng, shipLat] = ship.position.coordinates;
   const [destLng, destLat] = ship.destination.coordinates;
 
-  const startCell = lngLatToCell(gridCache, shipLng, shipLat);
+  let startCell = lngLatToCell(gridCache, shipLng, shipLat);
   const goalCell = lngLatToCell(gridCache, destLng, destLat);
   if (!startCell || !goalCell) return { path: null, distanceKm: Infinity };
 
-  // Ships from fleet.json may sit exactly on the navigable polygon boundary
-  // where booleanPointInPolygon returns false. We're permissive about start cell
-  // walkability when no zone caused this — only enforce for zone breach situations.
-  const allowStartUnwalkable = true;
+  // The simplified navigable polygon is a few km off real coastline in places,
+  // so several fleet.json starting positions land in unwalkable cells. Snap to
+  // the nearest navigable cell so A* always has a valid start. (Goal-cell
+  // snapping is handled inside findPath.)
+  if (!isCellWalkable(gridCache, startCell)) {
+    const snapped = snapToWalkable(gridCache, startCell, 8);
+    if (snapped) startCell = snapped;
+  }
 
+  const allowStartUnwalkable = true;
   const cellPath = findPath(gridCache, startCell, goalCell, { allowStartUnwalkable });
 
   // If A* couldn't find a path (e.g. polygon self-intersection, narrow channel),
@@ -123,30 +128,32 @@ const PERSIAN_GULF_MID = [54.50, 26.00]; // Open water, central Persian Gulf
 const HORMUZ_LNG = 56.5;
 
 /**
- * Corridor fallback: routes ships through the Hormuz strait using pre-defined
- * waypoints when A* fails, so ships always follow a geographically plausible path.
+ * Corridor fallback: routes ships through the Hormuz strait via pre-defined
+ * waypoints when A* fails. Each segment is validated against the navigable
+ * polygon at sub-cell resolution — if any segment would cross land, we return
+ * null so the caller marks the ship 'stranded' rather than drawing through land.
  */
 function computeDirectFallback(ship, opts = {}) {
   if (!gridCache) return null;
-  const start = ship.position.coordinates; // [lng, lat]
+  const start = ship.position.coordinates;
   const goal = ship.destination.coordinates;
 
+  const navPoly = gridCache.navigablePolygon
+    ? turf.polygon(gridCache.navigablePolygon.coordinates)
+    : null;
+
   const startInGulf = start[0] < HORMUZ_LNG;
-  const goalInGulf  = goal[0]  < HORMUZ_LNG;
+  const goalInGulf = goal[0] < HORMUZ_LNG;
 
   let waypoints;
   if (startInGulf && !goalInGulf) {
-    // Persian Gulf → Gulf of Oman: go through strait west→east
     waypoints = [start.slice(), PERSIAN_GULF_MID, HORMUZ_WEST, HORMUZ_EAST, GULF_OMAN_MID, goal.slice()];
   } else if (!startInGulf && goalInGulf) {
-    // Gulf of Oman → Persian Gulf: go through strait east→west
     waypoints = [start.slice(), GULF_OMAN_MID, HORMUZ_EAST, HORMUZ_WEST, PERSIAN_GULF_MID, goal.slice()];
   } else {
-    // Same side — direct within-gulf route, but deflect around zones
     waypoints = [start.slice(), goal.slice()];
   }
 
-  // Deflect around any active user-drawn zones that block the path
   if (!opts.shipInsideZone) {
     const zones = gridCache.zones || [];
     for (const z of zones) {
@@ -165,5 +172,49 @@ function computeDirectFallback(ship, opts = {}) {
     }
   }
 
+  if (navPoly) {
+    for (let i = 1; i < waypoints.length; i++) {
+      if (!segmentInPolygon(waypoints[i - 1], waypoints[i], navPoly)) {
+        return null;
+      }
+    }
+  }
+
   return waypoints;
+}
+
+function segmentInPolygon(a, b, poly) {
+  const samples = 24;
+  for (let k = 0; k <= samples; k++) {
+    const t = k / samples;
+    const lng = a[0] + (b[0] - a[0]) * t;
+    const lat = a[1] + (b[1] - a[1]) * t;
+    if (!turf.booleanPointInPolygon(turf.point([lng, lat]), poly)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isCellWalkable(grid, cell) {
+  if (!cell) return false;
+  if (cell.r < 0 || cell.r >= grid.rows || cell.c < 0 || cell.c >= grid.cols) return false;
+  return grid.cells[cell.r * grid.cols + cell.c] > 0;
+}
+
+function snapToWalkable(grid, cell, maxRadius) {
+  if (isCellWalkable(grid, cell)) return cell;
+  for (let radius = 1; radius <= maxRadius; radius++) {
+    for (let dr = -radius; dr <= radius; dr++) {
+      for (let dc = -radius; dc <= radius; dc++) {
+        if (Math.abs(dr) !== radius && Math.abs(dc) !== radius) continue;
+        const r = cell.r + dr;
+        const c = cell.c + dc;
+        if (r >= 0 && r < grid.rows && c >= 0 && c < grid.cols && grid.cells[r * grid.cols + c] > 0) {
+          return { r, c };
+        }
+      }
+    }
+  }
+  return null;
 }

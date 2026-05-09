@@ -73,7 +73,12 @@ router.post('/fleet/reset', (req, res) => {
     });
   }
   for (const key of [...state.activeAlertKeys]) {
-    if (key.startsWith('fuel:') || key.startsWith('predict-fuel:') || key.startsWith('stranded:')) {
+    if (
+      key.startsWith('fuel-low:') ||
+      key.startsWith('fuel-out:') ||
+      key.startsWith('predict-fuel:') ||
+      key.startsWith('stranded:')
+    ) {
       state.activeAlertKeys.delete(key);
     }
   }

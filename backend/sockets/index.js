@@ -3,6 +3,7 @@ import * as state from '../simulator/state.js';
 import * as alerts from '../services/alerts.js';
 import * as weather from '../services/weather.js';
 import { registerHandlers } from './handlers.js';
+import { serializeShip } from '../simulator/tick.js';
 import { env } from '../config/env.js';
 
 export function attachSocketServer(httpServer) {
@@ -37,7 +38,7 @@ export function attachSocketServer(httpServer) {
 
       const cfg = state.getFleetConfig();
       socket.emit('fleet:snapshot', {
-        ships: state.allShips(),
+        ships: state.allShips().map(serializeShip),
         zones: state.allZones(),
         activeAlerts: state.activeAlerts(),
         navigablePolygon: cfg?.navigablePolygon || null,
