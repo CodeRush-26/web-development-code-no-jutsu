@@ -3,7 +3,7 @@ import * as state from './state.js';
 import { planRoute } from '../routing/index.js';
 import { getGrid } from '../routing/index.js';
 import { applyWeatherOverlay } from '../routing/grid.js';
-import { createAlert } from '../services/alerts.js';
+import { createAlert, resolveAlert } from '../services/alerts.js';
 import { getCachedWeather, refreshWeatherAsync } from '../services/weather.js';
 import { env } from '../config/env.js';
 
@@ -272,6 +272,8 @@ function checkGeofences(allShips, zonesArr) {
 // Tracks last alert timestamp per ship pair to enforce 30-second re-alert cooldown.
 // Map<pairKey, lastAlertMs>
 const proximityCooldown = new Map();
+// Map<pairKey, alertId> to properly resolve them when ships separate
+const proximityAlertIds = new Map();
 const PROXIMITY_COOLDOWN_MS = 30_000;
 
 /**
@@ -304,17 +306,24 @@ function checkProximity(allShips) {
         if (!state.activeAlertKeys.has(key) && cooldownExpired) {
           state.activeAlertKeys.add(key);
           proximityCooldown.set(key, now);
-          createAlert({
+          const alert = createAlert({
             type: 'proximity',
-            severity: 'medium',
+            severity: 'critical',
             shipIds: [a.shipId, b.shipId],
-            message: `⚠ ${a.name} (${a.shipId}) ↔ ${b.name} (${b.shipId}) — ${km.toFixed(2)} km apart (threshold: ${env.PROXIMITY_THRESHOLD_KM} km)`
+            message: `PROXIMITY BREACH: ${a.name} (${a.shipId}) and ${b.name} (${b.shipId}) are ${km.toFixed(2)} km apart!`
           });
+          proximityAlertIds.set(key, alert.alertId);
+          console.log(`[ALERT] Proximity breach created: ${a.shipId}-${b.shipId} at ${km.toFixed(2)}km`);
         }
       } else {
         // Ships moved beyond threshold — clear active flag so next approach re-alerts
         if (state.activeAlertKeys.has(key)) {
           state.activeAlertKeys.delete(key);
+          const alertId = proximityAlertIds.get(key);
+          if (alertId) {
+            resolveAlert(alertId);
+            proximityAlertIds.delete(key);
+          }
         }
       }
     }
@@ -335,8 +344,11 @@ function checkPredictiveAlerts(allShips, zonesArr) {
       const result = planRoute(ship);
       if (result.path && !result.sufficientFuel) {
         const shortfallTons = result.fuelEstimate - ship.fuel;
+        // Only alert if shortfall is more than 5% of capacity to avoid noise on marginal cases
+        const isSignificantShortfall = shortfallTons > (ship.fuelCapacity * 0.05);
         const key = `predict-fuel:${ship.shipId}`;
-        if (!state.activeAlertKeys.has(key)) {
+
+        if (isSignificantShortfall && !state.activeAlertKeys.has(key)) {
           state.activeAlertKeys.add(key);
           const distLeft = result.distanceKm;
           const fuelRange = (ship.fuel / result.fuelEstimate) * distLeft;
@@ -347,6 +359,8 @@ function checkPredictiveAlerts(allShips, zonesArr) {
             shipIds: [ship.shipId],
             message: `⚠ Predictive: ${ship.name} will run out of fuel ~${shortKm} km short of ${ship.destination.portName || 'port'}. Shortfall: ${shortfallTons.toFixed(0)}t`
           });
+        } else if (!isSignificantShortfall && state.activeAlertKeys.has(key)) {
+          state.activeAlertKeys.delete(key);
         }
       } else {
         // Clear prediction if fuel is now sufficient
@@ -377,7 +391,8 @@ function checkPredictiveAlerts(allShips, zonesArr) {
               );
               const speedKmh = ship.speed * 1.852;
               const minutesToEntry = Math.round((distToWp / speedKmh) * 60);
-              if (minutesToEntry <= 10) {
+              // Only alert if entry is imminent (within 5 mins or 5km)
+              if (minutesToEntry <= 5 || distToWp <= 5) {
                 state.activeAlertKeys.add(zoneKey);
                 createAlert({
                   type: 'predictive_zone',

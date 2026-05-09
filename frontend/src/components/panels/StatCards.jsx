@@ -74,15 +74,23 @@ export default function StatCards() {
   );
 }
 
-function StatCard({ icon: Icon, gradient, borderColor, iconColor, label, value, sub, subColor, pulse }) {
+function StatCard({ icon: Icon, gradient, borderColor, iconColor, label, value, sub, subColor, pulse, pct }) {
   return (
     <div
-      className={`relative p-4 rounded-xl bg-gradient-to-br ${gradient} border ${borderColor} backdrop-blur-sm overflow-hidden transition-all duration-300 hover:scale-[1.02] ${
+      className={`relative p-4 rounded-xl bg-gradient-to-br ${gradient} border ${borderColor} backdrop-blur-sm overflow-hidden transition-all duration-300 hover:scale-[1.02] group ${
         pulse ? 'animate-border-breathe' : ''
       }`}
     >
+      {/* Background Progress Fill */}
+      {pct !== undefined && (
+        <div 
+          className="absolute bottom-0 left-0 h-1 bg-white/10 transition-all duration-1000 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      )}
+      
       {/* Subtle grid pattern */}
-      <div className="absolute inset-0 opacity-[0.03]"
+      <div className="absolute inset-0 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity"
         style={{
           backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
           backgroundSize: '20px 20px'
@@ -90,13 +98,15 @@ function StatCard({ icon: Icon, gradient, borderColor, iconColor, label, value, 
       />
       
       <div className="relative flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-bg-card/50 border border-bg-line flex items-center justify-center shrink-0">
+        <div className="w-9 h-9 rounded-lg bg-bg-card/50 border border-bg-line flex items-center justify-center shrink-0 shadow-inner group-hover:border-accent-cyan/30 transition-colors">
           <Icon className={`w-4.5 h-4.5 ${iconColor}`} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="section-label">{label}</p>
-          <p className="text-2xl font-bold font-data text-ink-1 leading-tight mt-0.5">{value}</p>
-          <p className={`text-[10px] font-semibold font-mono ${subColor}`}>{sub}</p>
+          <p className="section-label group-hover:text-ink-2 transition-colors">{label}</p>
+          <div className="flex items-baseline gap-2">
+            <p className="text-2xl font-bold font-data text-ink-1 leading-tight mt-0.5 tracking-tight">{value}</p>
+            <p className={`text-[10px] font-bold font-mono ${subColor}`}>{sub}</p>
+          </div>
         </div>
       </div>
     </div>
