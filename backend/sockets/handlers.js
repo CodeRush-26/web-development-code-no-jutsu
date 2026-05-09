@@ -200,6 +200,7 @@ function applyDirective(ship, directive) {
         ship.currentPath = [];
         ship.pathIndex = 0;
         ship.status = 'rerouting';
+        if (ship.speed === 0) ship.speed = (ship.maxSpeed || 20) * 0.7;
       }
       break;
     case 'divert':
@@ -208,6 +209,7 @@ function applyDirective(ship, directive) {
         ship.currentPath = [wp, ...(ship.currentPath || [])];
         ship.pathIndex = 0;
         ship.status = 'rerouting';
+        if (ship.speed === 0) ship.speed = (ship.maxSpeed || 20) * 0.7;
       }
       break;
     case 'hold':
@@ -221,6 +223,7 @@ function applyDirective(ship, directive) {
       ship.currentPath = [];
       ship.pathIndex = 0;
       ship.status = 'rerouting';
+      if (ship.speed === 0) ship.speed = (ship.maxSpeed || 20) * 0.7;
       break;
   }
 }

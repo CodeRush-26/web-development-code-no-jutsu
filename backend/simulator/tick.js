@@ -166,7 +166,9 @@ function advanceShip(ship, dtSec, zonesArr) {
         });
       }
     } else {
-      if (ship.status === 'insufficient_fuel') ship.status = 'normal';
+      if (ship.status === 'insufficient_fuel' || ship.status === 'rerouting') {
+        ship.status = 'normal';
+      }
       state.activeAlertKeys.delete(lowKey);
     }
   }
