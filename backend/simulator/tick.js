@@ -4,7 +4,7 @@ import { planRoute } from '../routing/index.js';
 import { getGrid } from '../routing/index.js';
 import { applyWeatherOverlay } from '../routing/grid.js';
 import { createAlert, resolveAlert } from '../services/alerts.js';
-import { getCachedWeather, refreshWeatherAsync } from '../services/weather.js';
+import { getCachedWeather, refreshWeatherAsync, setIo as setWeatherIo } from '../services/weather.js';
 import { env } from '../config/env.js';
 
 let timer = null;
@@ -13,9 +13,14 @@ let tickCount = 0;
 
 export function startTickLoop(socketServer) {
   io = socketServer;
+  setWeatherIo(socketServer); // Ensure weather service can broadcast
   if (timer) return;
   timer = setInterval(runTick, env.TICK_MS);
   console.log(`✓ Simulator tick running every ${env.TICK_MS}ms`);
+  
+  // Initial weather fetch for all ships so dashboard isn't empty
+  const ships = state.allShips();
+  for (const s of ships) refreshWeatherAsync(s).catch(() => {});
 }
 
 export function stopTickLoop() {
@@ -110,6 +115,20 @@ function advanceShip(ship, dtSec, zonesArr) {
       }
     }
 
+    // Check if ship is in adverse weather zone
+    ship.inAdverseWeather = false;
+    for (const z of zonesArr) {
+      try {
+        const name = (z.name || '').toLowerCase();
+        if (name.includes('storm') || name.includes('weather')) {
+          if (turf.booleanPointInPolygon(turf.point(ship.position.coordinates), turf.polygon(z.geometry.coordinates))) {
+            ship.inAdverseWeather = true;
+            break;
+          }
+        }
+      } catch { /* skip malformed */ }
+    }
+
     const planned = planRoute(ship);
     if (!planned.path) {
       ship.status = 'stranded';
@@ -128,20 +147,24 @@ function advanceShip(ship, dtSec, zonesArr) {
     }
     ship.currentPath = planned.path;
     ship.pathIndex = 0;
-    if (!planned.sufficientFuel && ship.status !== 'insufficient_fuel') {
+    
+    // Immediate fuel viability check
+    const fuelKey = `fuel:${ship.shipId}`;
+    if (!planned.sufficientFuel) {
       ship.status = 'insufficient_fuel';
-      const key = `fuel:${ship.shipId}`;
-      if (!state.activeAlertKeys.has(key)) {
-        state.activeAlertKeys.add(key);
+      if (!state.activeAlertKeys.has(fuelKey)) {
+        state.activeAlertKeys.add(fuelKey);
         createAlert({
           type: 'insufficient_fuel',
           severity: 'medium',
           shipIds: [ship.shipId],
-          message: `${ship.name} fuel low — may not reach destination`
+          message: `⚠ ${ship.name} fuel low — path to ${ship.destination?.portName || 'destination'} requires more than ${ship.fuel.toFixed(1)}t available`
         });
       }
-    } else if (ship.status !== 'distressed' && ship.status !== 'stranded') {
-      ship.status = 'normal';
+    } else {
+      // Clear insufficient_fuel if now sufficient (e.g. rerouted or refueled)
+      if (ship.status === 'insufficient_fuel') ship.status = 'normal';
+      state.activeAlertKeys.delete(fuelKey);
     }
   }
 
@@ -166,14 +189,20 @@ function advanceShip(ship, dtSec, zonesArr) {
   }
 
   // v³ fuel model: fuel_per_sec = k × speed³ × cargoMultiplier × weatherMultiplier
-  // Realistic: doubling speed → 8x fuel consumption
   const v = ship.speed;
   const baseBurn = env.FUEL_BURN_K * v * v * v * dtSec;
   const cargoMul = ship.cargoMultiplier || 1.0;
   const weatherMul = ship.inAdverseWeather ? env.ADVERSE_WEATHER_FUEL_MULTIPLIER : 1.0;
   const burn = baseBurn * cargoMul * weatherMul;
+  
+  const oldFuel = ship.fuel;
   ship.fuel = Math.max(0, ship.fuel - burn);
   ship.fuelBurnRate = burn / dtSec; // t/s for frontend display
+
+  // Numerical verification logging
+  if (ship.inAdverseWeather || tickCount % 30 === 0) {
+    console.log(`[FUEL] ${ship.name}: burn=${burn.toFixed(4)}t (base=${baseBurn.toFixed(4)}t, mul=${weatherMul.toFixed(2)}${ship.inAdverseWeather ? ' STORM' : ''}), fuel=${ship.fuel.toFixed(2)}t`);
+  }
 
   if (ship.fuel === 0) {
     ship.status = 'out_of_fuel';

@@ -25,7 +25,6 @@ export function buildGrid(navigablePolygon, zones, cellSizeKm = CELL_SIZE_KM) {
 
   const cells = new Float32Array(rows * cols); // 0=blocked, 1=normal, >1=weather penalty
   const navPoly = turf.polygon(navigablePolygon.coordinates);
-  const zonePolys = zones.map((z) => turf.polygon(z.geometry.coordinates));
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -33,16 +32,30 @@ export function buildGrid(navigablePolygon, zones, cellSizeKm = CELL_SIZE_KM) {
       const lat = minLat + (r + 0.5) * latStep;
       const pt = turf.point([lng, lat]);
 
-      let walkable = turf.booleanPointInPolygon(pt, navPoly);
-      if (walkable) {
-        for (const zp of zonePolys) {
-          if (turf.booleanPointInPolygon(pt, zp)) {
-            walkable = false;
-            break;
-          }
-        }
+      const isNavigable = turf.booleanPointInPolygon(pt, navPoly);
+      if (!isNavigable) {
+        cells[r * cols + c] = 0;
+        continue;
       }
-      cells[r * cols + c] = walkable ? 1.0 : 0;
+
+      let cost = 1.0;
+      for (const z of zones) {
+        try {
+          const zp = turf.polygon(z.geometry.coordinates);
+          if (turf.booleanPointInPolygon(pt, zp)) {
+            const name = (z.name || '').toLowerCase();
+            if (name.includes('storm') || name.includes('weather')) {
+              // Storm zones are expensive but walkable
+              cost = Math.max(cost, 5.0);
+            } else {
+              // Other zones (restricted, danger) are blocked
+              cost = 0;
+              break;
+            }
+          }
+        } catch { /* skip malformed */ }
+      }
+      cells[r * cols + c] = cost;
     }
   }
 
