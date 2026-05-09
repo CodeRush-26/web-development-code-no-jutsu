@@ -39,7 +39,11 @@ async function runTick() {
 
   // 1. advance every ship
   for (const ship of allShips) {
-    if (['arrived', 'out_of_fuel', 'stopped'].includes(ship.status)) continue;
+    if (['arrived', 'out_of_fuel', 'stopped', 'stranded'].includes(ship.status)) {
+      ship.speed = 0;
+      ship.fuelBurnRate = 0;
+      continue;
+    }
     advanceShip(ship, dtSec, zonesArr);
   }
 

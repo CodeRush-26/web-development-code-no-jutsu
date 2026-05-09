@@ -103,3 +103,11 @@ export function updateDirective(directiveId, partial) {
   Object.assign(d, partial);
   return d;
 }
+
+export function allDirectives() {
+  return [...directives.values()].sort((a, b) => b.issuedAt - a.issuedAt);
+}
+
+export function getDirectivesForShip(shipId) {
+  return allDirectives().filter((d) => d.shipId === shipId);
+}

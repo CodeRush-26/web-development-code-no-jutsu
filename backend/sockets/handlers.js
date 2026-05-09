@@ -96,9 +96,19 @@ export function registerHandlers(io, socket) {
       respondedAt: null,
       distressMessage: null
     };
+
+    // Auto-apply if no captain is connected to this ship's room
+    const shipRoom = io.sockets.adapter.rooms.get(`ship:${shipId}`);
+    const hasCaptain = shipRoom && shipRoom.size > 0;
+
+    if (!hasCaptain) {
+      console.log(`[directive] No captain connected to ${shipId} — auto-applying ${type}`);
+      directive.status = 'accepted';
+      directive.respondedAt = Date.now();
+      applyDirective(state.getShip(shipId), directive);
+    }
+
     state.addDirective(directive);
-    // Both the targeted captain AND every Command operator need a copy so the
-    // Command "Directives" panel can show pending/accepted/escalated state.
     io.to(`ship:${shipId}`).to('command').emit('directive:incoming', directive);
     socket.emit('directive:sent', { directiveId: directive.directiveId });
   });
@@ -182,6 +192,7 @@ export function registerHandlers(io, socket) {
 
 function applyDirective(ship, directive) {
   if (!ship) return;
+  console.log(`[directive] Applying ${directive.type} to ${ship.shipId}`);
   switch (directive.type) {
     case 'change_destination':
       if (directive.payload?.destination) {
@@ -202,6 +213,8 @@ function applyDirective(ship, directive) {
     case 'hold':
       ship.speed = 0;
       ship.status = 'stopped';
+      ship.fuelBurnRate = 0;
+      console.log(`[directive] ${ship.shipId} SPEED SET TO 0, STATUS SET TO STOPPED`);
       break;
     case 'reroute':
     default:

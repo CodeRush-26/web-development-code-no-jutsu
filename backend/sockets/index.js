@@ -41,6 +41,7 @@ export function attachSocketServer(httpServer) {
         ships: state.allShips().map(serializeShip),
         zones: state.allZones(),
         activeAlerts: state.activeAlerts(),
+        directives: state.allDirectives(),
         navigablePolygon: cfg?.navigablePolygon || null,
         boundingBox: cfg?.boundingBox || null,
         ports: cfg?.ports || [],
