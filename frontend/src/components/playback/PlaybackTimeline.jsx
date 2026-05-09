@@ -1,23 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Maximize2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Radio } from 'lucide-react';
 import { useFleetStore } from '../../store/fleetStore';
 import { REST_BASE } from '../../lib/config';
 
-/**
- * PDF requirement: timeline scrubber for last hour at 30s resolution that
- * actually replays ship positions on the map.
- *
- * Implementation:
- *  - Pulls /api/history/all (in-memory ring buffer) on mount + every 30s.
- *  - When the user scrubs or hits Play, we call store.setPlaybackTime(timestamp).
- *  - The map reads from a separate selector that prefers playback positions
- *    over live positions when playbackTime is set.
- *  - "Go to Live" clears playbackTime, returning to live updates.
- */
+const SPEEDS = [
+  { label: '1×', ms: 800 },
+  { label: '2×', ms: 400 },
+  { label: '4×', ms: 200 },
+  { label: '8×', ms: 100 }
+];
+
 export default function PlaybackTimeline() {
   const [playing, setPlaying] = useState(false);
   const [snapshots, setSnapshots] = useState([]);
   const [idx, setIdx] = useState(0);
+  const [speedIdx, setSpeedIdx] = useState(0);
   const setPlaybackSnapshot = useFleetStore((s) => s.setPlaybackSnapshot);
   const playbackTime = useFleetStore((s) => s.playbackTime);
 
@@ -53,14 +50,14 @@ export default function PlaybackTimeline() {
         }
         return next;
       });
-    }, 800);
+    }, SPEEDS[speedIdx].ms);
     return () => clearInterval(t);
-  }, [playing, snapshots.length]);
+  }, [playing, snapshots.length, speedIdx]);
 
-  // Push current snapshot to the store whenever idx changes (in playback mode)
+  // Push current snapshot to the store whenever idx changes
   useEffect(() => {
     if (!snapshots.length) return;
-    if (playbackTime === null && !playing) return; // live mode
+    if (playbackTime === null && !playing) return;
     const snap = snapshots[Math.min(idx, snapshots.length - 1)];
     if (snap) setPlaybackSnapshot(snap);
   }, [idx, snapshots, playing, playbackTime, setPlaybackSnapshot]);
@@ -77,31 +74,34 @@ export default function PlaybackTimeline() {
   return (
     <div className="card p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] text-ink-3 uppercase tracking-widest">
-          Playback (Last 1 Hour · 30s steps)
-        </p>
+        <div className="flex items-center gap-2">
+          <Radio className="w-3.5 h-3.5 text-accent-cyan" />
+          <p className="section-label">Timeline Playback</p>
+        </div>
         <span
-          className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+          className={`text-[9px] font-bold font-mono px-2 py-0.5 rounded-full uppercase tracking-wider ${
             isLive
-              ? 'bg-accent-green/20 text-accent-green border border-accent-green/40'
-              : 'bg-accent-amber/20 text-accent-amber border border-accent-amber/40'
+              ? 'bg-accent-green/15 text-accent-green border border-accent-green/30'
+              : 'bg-accent-amber/15 text-accent-amber border border-accent-amber/30'
           }`}
         >
-          {isLive ? 'LIVE' : 'PLAYBACK'}
+          {isLive ? '● Live' : '◉ Playback'}
         </span>
       </div>
 
-      <div className="text-sm text-ink-2 flex items-center gap-2 font-mono">
-        <span>
-          {ts ? ts.toLocaleTimeString() : '— no history yet —'}
-          {snapshots.length > 0 && (
-            <span className="ml-2 text-ink-3">
-              ({idx + 1}/{snapshots.length})
-            </span>
-          )}
+      {/* Time display */}
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-mono text-ink-1">
+          {ts ? ts.toLocaleTimeString() : '— no history —'}
         </span>
+        {snapshots.length > 0 && (
+          <span className="font-mono text-ink-3">
+            {idx + 1}/{snapshots.length} snapshots
+          </span>
+        )}
       </div>
 
+      {/* Custom range slider */}
       <input
         type="range"
         min={0}
@@ -110,21 +110,21 @@ export default function PlaybackTimeline() {
         onChange={(e) => {
           const v = Number(e.target.value);
           setIdx(v);
-          // entering playback on scrub
           if (snapshots[v]) setPlaybackSnapshot(snapshots[v]);
         }}
-        className="w-full accent-accent-cyan"
+        className="w-full"
         disabled={!snapshots.length}
       />
 
-      <div className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-2">
-          <IconBtn
+      {/* Controls row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <PlayBtn
             icon={SkipBack}
             disabled={!snapshots.length}
             onClick={() => setIdx((i) => Math.max(i - 1, 0))}
           />
-          <IconBtn
+          <PlayBtn
             icon={playing ? Pause : Play}
             primary
             disabled={!snapshots.length}
@@ -133,45 +133,63 @@ export default function PlaybackTimeline() {
               setPlaying((p) => !p);
             }}
           />
-          <IconBtn
+          <PlayBtn
             icon={SkipForward}
             disabled={!snapshots.length}
             onClick={() => setIdx((i) => Math.min(i + 1, snapshots.length - 1))}
           />
         </div>
+
+        {/* Speed control */}
+        <div className="flex items-center gap-1">
+          {SPEEDS.map((s, i) => (
+            <button
+              key={s.label}
+              onClick={() => setSpeedIdx(i)}
+              className={`text-[10px] font-mono font-bold px-2 py-1 rounded transition-all ${
+                speedIdx === i
+                  ? 'bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30'
+                  : 'text-ink-3 hover:text-ink-1 border border-transparent'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
         <button
           onClick={goLive}
-          className={`px-3 py-1.5 rounded text-xs font-bold transition ${
+          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold font-heading tracking-wider uppercase transition-all ${
             isLive
-              ? 'bg-accent-green/20 text-accent-green cursor-default'
-              : 'bg-accent-cyan text-bg-base hover:bg-accent-cyan/90'
+              ? 'bg-accent-green/15 text-accent-green border border-accent-green/20 cursor-default'
+              : 'bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/25 hover:shadow-glow-cyan'
           }`}
         >
-          Go to Live
+          Go Live
         </button>
       </div>
 
-      <p className="text-[10px] text-ink-3">
+      <p className="text-[10px] text-ink-3 font-mono">
         {snapshots.length === 0
-          ? 'Snapshots are saved every 30s. Wait a bit for history to accumulate.'
-          : 'Drag the slider to rewind. Map shows positions at that time.'}
+          ? 'Snapshots saved every 30s. Waiting for history…'
+          : 'Drag to rewind · Map shows positions at selected time'}
       </p>
     </div>
   );
 }
 
-function IconBtn({ icon: Icon, primary, disabled, onClick }) {
+function PlayBtn({ icon: Icon, primary, disabled, onClick }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`w-9 h-9 rounded-full flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed ${
+      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-25 disabled:cursor-not-allowed ${
         primary
-          ? 'bg-accent-cyan text-bg-base hover:bg-accent-cyan/90'
-          : 'bg-bg-card border border-bg-line text-ink-1 hover:bg-bg-line/40'
+          ? 'bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30 hover:bg-accent-cyan/30 hover:shadow-glow-cyan'
+          : 'bg-bg-card/60 border border-bg-line text-ink-2 hover:text-ink-1 hover:bg-bg-elevated/40'
       }`}
     >
-      <Icon className="w-4 h-4" />
+      <Icon className="w-3.5 h-3.5" />
     </button>
   );
 }

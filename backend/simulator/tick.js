@@ -231,7 +231,8 @@ function serializeShip(s) {
     fuelCapacity: s.fuelCapacity,
     cargo: s.cargo,
     status: s.status,
-    inAdverseWeather: s.inAdverseWeather
+    inAdverseWeather: s.inAdverseWeather,
+    currentPath: s.currentPath || []
   };
 }
 

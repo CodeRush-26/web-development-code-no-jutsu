@@ -9,8 +9,8 @@ export const REST_BASE = API_URL || '';
 export const TICK_MS = 1000;
 export const MAP_CENTER = [26.0, 55.0];
 export const MAP_ZOOM = 7;
-export const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-export const TILE_ATTR = '&copy; OpenStreetMap contributors';
+export const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+export const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>';
 
 export const STATUS_LABEL = {
   normal: 'Normal',

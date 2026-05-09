@@ -20,81 +20,85 @@ export default function StatCards() {
     <div className="grid grid-cols-5 gap-3">
       <StatCard
         icon={Ship}
-        iconBg="bg-accent-cyan/20"
+        gradient="from-accent-cyan/15 to-accent-blue/10"
+        borderColor="border-accent-cyan/15"
         iconColor="text-accent-cyan"
         label="Total Ships"
         value={total}
         sub="Active"
-        subColor="text-ink-2"
+        subColor="text-ink-3"
       />
       <StatCard
         icon={Activity}
-        iconBg="bg-accent-green/20"
+        gradient="from-accent-green/15 to-accent-teal/10"
+        borderColor="border-accent-green/15"
         iconColor="text-accent-green"
         label="In Transit"
         value={inTransit}
         sub={`${transitPct}%`}
         subColor="text-accent-green"
-        spark="up"
       />
       <StatCard
         icon={Crosshair}
-        iconBg="bg-accent-red/20"
+        gradient="from-accent-red/15 to-accent-rose/10"
+        borderColor={distressed > 0 ? 'border-accent-red/40' : 'border-accent-red/15'}
         iconColor="text-accent-red"
         label="Distressed"
         value={distressed}
         sub={`${distressedPct}%`}
         subColor="text-accent-red"
-        spark="down"
+        pulse={distressed > 0}
       />
       <StatCard
         icon={AlertOctagon}
-        iconBg="bg-accent-amber/20"
+        gradient="from-accent-amber/15 to-accent-gold/10"
+        borderColor="border-accent-amber/15"
         iconColor="text-accent-amber"
-        label="Restricted Zones"
+        label="Zones"
         value={activeZones}
-        sub="Active"
+        sub="Restricted"
         subColor="text-accent-amber"
       />
       <StatCard
         icon={AlertTriangle}
-        iconBg="bg-accent-red/20"
+        gradient="from-accent-red/15 to-accent-amber/10"
+        borderColor={activeAlerts > 0 ? 'border-accent-red/30' : 'border-accent-red/15'}
         iconColor="text-accent-red"
         label="Alerts"
         value={activeAlerts}
         sub="Active"
         subColor="text-accent-red"
+        pulse={activeAlerts > 3}
       />
     </div>
   );
 }
 
-function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub, subColor, spark }) {
+function StatCard({ icon: Icon, gradient, borderColor, iconColor, label, value, sub, subColor, pulse }) {
   return (
-    <div className="card p-4 flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>
-        <Icon className={`w-5 h-5 ${iconColor}`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] text-ink-3 uppercase tracking-widest">{label}</p>
-        <p className="text-2xl font-bold text-ink-1 leading-tight">{value}</p>
-        <p className={`text-[11px] font-semibold ${subColor}`}>{sub}</p>
-      </div>
-      {spark && <Sparkline direction={spark} />}
-    </div>
-  );
-}
-
-function Sparkline({ direction }) {
-  const isUp = direction === 'up';
-  return (
-    <svg width="48" height="24" viewBox="0 0 48 24" fill="none" className="shrink-0">
-      <path
-        d={isUp ? 'M2 18 L10 14 L18 16 L26 10 L34 8 L46 4' : 'M2 6 L10 10 L18 8 L26 14 L34 16 L46 20'}
-        stroke={isUp ? '#10b981' : '#ef4444'}
-        strokeWidth="1.5"
-        fill="none"
+    <div
+      className={`relative p-4 rounded-xl bg-gradient-to-br ${gradient} border ${borderColor} backdrop-blur-sm overflow-hidden transition-all duration-300 hover:scale-[1.02] ${
+        pulse ? 'animate-border-breathe' : ''
+      }`}
+    >
+      {/* Subtle grid pattern */}
+      <div className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+          backgroundSize: '20px 20px'
+        }}
       />
-    </svg>
+      
+      <div className="relative flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg bg-bg-card/50 border border-bg-line flex items-center justify-center shrink-0">
+          <Icon className={`w-4.5 h-4.5 ${iconColor}`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="section-label">{label}</p>
+          <p className="text-2xl font-bold font-data text-ink-1 leading-tight mt-0.5">{value}</p>
+          <p className={`text-[10px] font-semibold font-mono ${subColor}`}>{sub}</p>
+        </div>
+      </div>
+    </div>
   );
 }

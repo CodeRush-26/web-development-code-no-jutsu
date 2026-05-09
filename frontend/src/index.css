@@ -5,119 +5,211 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   MARITIME OPS — DESIGN SYSTEM
+   "Naval Intelligence" aesthetic: dark, data-dense, alive
+   ============================================================ */
+
+/* --- Base Reset --- */
 html, body, #root {
   height: 100%;
   margin: 0;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
   color: #e6ecff;
-  background: #0a1226;
+  background: #060d1f;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* --- Custom Scrollbar --- */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #1f2c5a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #2a3a78; }
 
-/* Leaflet dark map tweaks */
+/* --- Font Utilities --- */
+.font-brand { font-family: 'Orbitron', sans-serif; }
+.font-heading { font-family: 'Rajdhani', sans-serif; }
+.font-data { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   LEAFLET MAP — DARK THEME
+   Using CartoDB Dark Matter tiles (natively dark, no filter hack)
+   ============================================================ */
 .leaflet-container {
-  background: #0a1226 !important;
-  font-family: inherit;
+  background: #060d1f !important;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
 }
+/* Remove the invert filter since we're using CartoDB dark tiles */
 .leaflet-tile-pane {
-  filter: invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(0.95) saturate(0.6);
+  /* No filter needed for CartoDB dark_all */
 }
 .leaflet-control-zoom a {
-  background: #142048 !important;
+  background: rgba(20, 32, 72, 0.9) !important;
   color: #e6ecff !important;
   border: 1px solid #1f2c5a !important;
+  backdrop-filter: blur(8px);
 }
-.leaflet-control-zoom a:hover { background: #1f2c5a !important; }
+.leaflet-control-zoom a:hover { background: rgba(31, 44, 90, 0.95) !important; }
 .leaflet-popup-content-wrapper {
-  background: #0f1a36 !important;
+  background: rgba(15, 26, 54, 0.95) !important;
   color: #e6ecff !important;
-  border: 1px solid #1f2c5a;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  border-radius: 10px !important;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 15px rgba(34, 211, 238, 0.08) !important;
 }
-.leaflet-popup-tip { background: #0f1a36 !important; }
+.leaflet-popup-tip { background: rgba(15, 26, 54, 0.95) !important; }
 .leaflet-control-attribution {
-  background: rgba(15,26,54,0.75) !important;
+  background: rgba(6, 13, 31, 0.8) !important;
   color: #6c789f !important;
+  font-size: 9px !important;
 }
 .leaflet-control-attribution a { color: #a8b2d6 !important; }
 
-/* Ship marker */
+/* ============================================================
+   SHIP MARKERS — "NAVAL INTELLIGENCE" STYLE
+   ============================================================ */
 .ship-marker {
   pointer-events: auto;
   transition: transform 0.08s linear;
 }
 .ship-icon {
-  width: 24px; height: 24px;
+  width: 28px; height: 28px;
   display: flex; align-items: center; justify-content: center;
   position: relative;
+  filter: drop-shadow(0 0 6px var(--ship-glow, rgba(34, 211, 238, 0.5)));
+  transition: filter 0.3s ease;
 }
-.ship-icon svg.ship-arrow { transform: rotate(var(--rot, 0deg)); transition: transform 0.3s ease-out; }
+.ship-icon:hover {
+  filter: drop-shadow(0 0 12px var(--ship-glow, rgba(34, 211, 238, 0.7)));
+  transform: scale(1.15);
+}
+.ship-icon svg.ship-arrow {
+  transform: rotate(var(--rot, 0deg));
+  transition: transform 0.3s ease-out;
+}
+.ship-icon svg.ship-hull {
+  transform: rotate(var(--rot, 0deg));
+  transition: transform 0.3s ease-out;
+}
+
+/* Weather badge */
 .ship-weather {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 16px;
-  height: 16px;
-  background: #f59e0b;
-  color: #0a1226;
+  top: -6px;
+  right: -6px;
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #060d1f;
   border-radius: 50%;
-  font-size: 11px;
+  font-size: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  box-shadow: 0 0 6px rgba(245,158,11,0.6);
+  box-shadow: 0 0 8px rgba(245,158,11,0.6);
   animation: weather-pulse 2s ease-in-out infinite;
 }
 @keyframes weather-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
+  0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(245,158,11,0.4); }
+  50% { transform: scale(1.2); box-shadow: 0 0 14px rgba(245,158,11,0.7); }
 }
+
+/* Ship label */
 .ship-label {
   position: absolute;
-  top: 22px;
+  top: 26px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
+  font-family: 'IBM Plex Mono', monospace;
   color: #e6ecff;
-  background: rgba(10,18,38,0.8);
+  background: rgba(6, 13, 31, 0.85);
   padding: 1px 6px;
   border-radius: 3px;
   white-space: nowrap;
   pointer-events: none;
+  border: 1px solid rgba(34, 211, 238, 0.15);
+  letter-spacing: 0.04em;
 }
+
+/* Distress pulse ring */
 .ship-distress-ring {
   position: absolute;
-  top: -8px; left: -8px;
-  width: 40px; height: 40px;
+  top: -10px; left: -10px;
+  width: 48px; height: 48px;
   border: 2px solid #dc2626;
   border-radius: 50%;
-  animation: ping-ring 1.4s ease-out infinite;
+  animation: ping-ring 1.2s ease-out infinite;
+}
+.ship-distress-ring-2 {
+  position: absolute;
+  top: -10px; left: -10px;
+  width: 48px; height: 48px;
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  border-radius: 50%;
+  animation: ping-ring 1.2s ease-out 0.4s infinite;
 }
 @keyframes ping-ring {
-  0% { transform: scale(0.6); opacity: 1; }
-  100% { transform: scale(1.4); opacity: 0; }
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
 }
 
-/* Severity bars */
+/* Ship glow ring for selected state */
+.ship-selected-ring {
+  position: absolute;
+  top: -6px; left: -6px;
+  width: 40px; height: 40px;
+  border: 2px solid #22d3ee;
+  border-radius: 50%;
+  animation: selected-pulse 2s ease-in-out infinite;
+}
+@keyframes selected-pulse {
+  0%, 100% { border-color: rgba(34, 211, 238, 0.4); box-shadow: 0 0 8px rgba(34, 211, 238, 0.2); }
+  50% { border-color: rgba(34, 211, 238, 0.8); box-shadow: 0 0 16px rgba(34, 211, 238, 0.4); }
+}
+
+/* ============================================================
+   SEVERITY SYSTEM
+   ============================================================ */
 .severity-bar { width: 4px; min-width: 4px; align-self: stretch; border-radius: 2px; }
-.severity-critical { background: #dc2626; }
-.severity-high { background: #ea580c; }
-.severity-medium { background: #ca8a04; }
-.severity-low { background: #64748b; }
+.severity-critical { background: linear-gradient(180deg, #dc2626, #991b1b); box-shadow: 0 0 8px rgba(220,38,38,0.4); }
+.severity-high { background: linear-gradient(180deg, #ea580c, #c2410c); }
+.severity-medium { background: linear-gradient(180deg, #ca8a04, #a16207); }
+.severity-low { background: #4b5563; }
 
-/* Card */
+/* ============================================================
+   CARDS — GLASSMORPHISM + DEPTH
+   ============================================================ */
 .card {
-  background: linear-gradient(180deg, rgba(20,32,72,0.55) 0%, rgba(15,26,54,0.55) 100%);
-  border: 1px solid #1f2c5a;
+  background: linear-gradient(180deg, rgba(20, 32, 72, 0.5) 0%, rgba(10, 18, 38, 0.6) 100%);
+  border: 1px solid rgba(31, 44, 90, 0.6);
   border-radius: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.card:hover {
+  border-color: rgba(34, 211, 238, 0.15);
+}
+.card-glow {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), 0 0 20px rgba(34, 211, 238, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.card-danger {
+  border-color: rgba(220, 38, 38, 0.3);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), 0 0 15px rgba(220, 38, 38, 0.08);
+}
+.card-warning {
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), 0 0 15px rgba(245, 158, 11, 0.08);
 }
 
-/* Pulse for live dot */
+/* ============================================================
+   LIVE INDICATORS
+   ============================================================ */
 .live-dot {
   width: 8px; height: 8px;
   background: #10b981;
@@ -130,15 +222,22 @@ html, body, #root {
   70% { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
   100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
 }
-
-/* Leaflet draw button overrides */
-.leaflet-draw-toolbar a {
-  background-color: #142048 !important;
-  border-color: #1f2c5a !important;
-  filter: invert(0.92) hue-rotate(180deg) brightness(0.9);
+.tick-dot {
+  width: 6px;
+  height: 6px;
+  background: #22d3ee;
+  border-radius: 50%;
+  opacity: 0.35;
+  transition: opacity 0.1s, transform 0.1s;
+}
+.tick-dot.beat {
+  opacity: 1;
+  transform: scale(1.5);
 }
 
-/* Disconnected banner */
+/* ============================================================
+   DISCONNECT BANNER
+   ============================================================ */
 .disconnect-banner {
   background: linear-gradient(90deg, rgba(220,38,38,0.95), rgba(127,29,29,0.95));
   border-bottom: 1px solid #b91c1c;
@@ -156,25 +255,191 @@ html, body, #root {
   to { transform: translateY(0); }
 }
 
-/* Tick pulse */
-.tick-dot {
-  width: 6px;
-  height: 6px;
-  background: #22d3ee;
-  border-radius: 50%;
-  opacity: 0.4;
-  transition: opacity 0.1s, transform 0.1s;
-}
-.tick-dot.beat {
-  opacity: 1;
-  transform: scale(1.4);
+/* ============================================================
+   LEAFLET DRAW OVERRIDES
+   ============================================================ */
+.leaflet-draw-toolbar a {
+  background-color: rgba(20, 32, 72, 0.9) !important;
+  border-color: #1f2c5a !important;
 }
 
-/* Severity flash */
+/* ============================================================
+   ALERT ANIMATIONS
+   ============================================================ */
 @keyframes severity-flash {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
 .severity-flash-critical {
-  animation: severity-flash 1.2s ease-in-out infinite;
+  animation: severity-flash 1s ease-in-out infinite;
+}
+.alert-entry {
+  animation: alert-slide-in 0.4s ease-out;
+}
+@keyframes alert-slide-in {
+  from { transform: translateX(30px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ============================================================
+   SCANLINE OVERLAY (subtle CRT/military feel)
+   ============================================================ */
+.scanlines::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(34, 211, 238, 0.008) 2px,
+    rgba(34, 211, 238, 0.008) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ============================================================
+   NOISE GRAIN TEXTURE
+   ============================================================ */
+.noise-grain::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
+.text-gradient-cyan {
+  background: linear-gradient(135deg, #22d3ee, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.text-gradient-danger {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.border-glow-cyan {
+  border-color: rgba(34, 211, 238, 0.3);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.1);
+}
+
+/* Button base */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(59, 130, 246, 0.2));
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  color: #22d3ee;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.3), rgba(59, 130, 246, 0.3));
+  box-shadow: 0 0 15px rgba(34, 211, 238, 0.15);
+  transform: translateY(-1px);
+}
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.2), rgba(239, 68, 68, 0.15));
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  color: #ef4444;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.btn-danger:hover {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.3), rgba(239, 68, 68, 0.25));
+  box-shadow: 0 0 15px rgba(220, 38, 38, 0.15);
+}
+
+/* Section label */
+.section-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #6c789f;
+}
+
+/* Data readout */
+.data-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: #e6ecff;
+}
+
+/* Fuel gauge arc styles */
+.fuel-gauge-bg { stroke: #1f2c5a; }
+.fuel-gauge-fill { transition: stroke-dasharray 0.5s ease; }
+
+/* Map overlay controls */
+.map-overlay {
+  position: absolute;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+  background: rgba(6, 13, 31, 0.85);
+  border: 1px solid rgba(31, 44, 90, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   CUSTOM RANGE SLIDER (for playback)
+   ============================================================ */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: #1f2c5a;
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #22d3ee;
+  border: 2px solid #060d1f;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.6);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #22d3ee;
+  border: 2px solid #060d1f;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
 }
