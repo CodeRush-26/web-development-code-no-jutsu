@@ -4,7 +4,7 @@ import { planRoute } from '../routing/index.js';
 import { getGrid } from '../routing/index.js';
 import { applyWeatherOverlay } from '../routing/grid.js';
 import { createAlert, resolveAlert } from '../services/alerts.js';
-import { getCachedWeather, refreshWeatherAsync, setIo as setWeatherIo } from '../services/weather.js';
+import { getCachedWeather, refreshWeatherAsync } from '../services/weather.js';
 import { env } from '../config/env.js';
 
 let timer = null;
@@ -13,7 +13,6 @@ let tickCount = 0;
 
 export function startTickLoop(socketServer) {
   io = socketServer;
-  setWeatherIo(socketServer); // Ensure weather service can broadcast
   if (timer) return;
   timer = setInterval(runTick, env.TICK_MS);
   console.log(`✓ Simulator tick running every ${env.TICK_MS}ms`);
