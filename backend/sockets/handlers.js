@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import * as turf from '@turf/turf';
 import * as state from '../simulator/state.js';
 import * as routing from '../routing/index.js';
 import { createAlert, resolveAlert } from '../services/alerts.js';
@@ -52,6 +53,15 @@ export function registerHandlers(io, socket) {
     if (!zoneId) return forbidden(socket, 'invalid_payload');
     state.removeZone(zoneId);
     routing.rebuildForZones(state.allZones());
+    // Un-strand ships that were stranded by this zone
+    for (const ship of state.allShips()) {
+      if (ship.status === 'stranded') {
+        state.activeAlertKeys.delete(`stranded:${ship.shipId}`);
+        ship.status = 'rerouting';
+        // Restore speed from fleet data (ships were stopped when stranded)
+        if (ship.speed === 0 && ship.maxSpeed) ship.speed = ship.maxSpeed * 0.6;
+      }
+    }
     invalidateShipPaths();
     io.to('fleet').emit('zone:update', { action: 'delete', zone: { zoneId } });
   });
@@ -191,10 +201,48 @@ function applyDirective(ship, directive) {
 }
 
 function invalidateShipPaths() {
+  const zonesArr = state.allZones();
   for (const ship of state.allShips()) {
-    if (['arrived', 'out_of_fuel', 'stopped', 'stranded'].includes(ship.status)) continue;
+    if (['arrived', 'out_of_fuel', 'stopped'].includes(ship.status)) continue;
+
+    // Clear existing path
     ship.currentPath = [];
     ship.pathIndex = 0;
-    if (ship.status === 'normal') ship.status = 'rerouting';
+
+    // Check if destination is now inside a zone → stranded
+    if (ship.destination?.coordinates && zonesArr.length > 0) {
+      const destPt = turf.point(ship.destination.coordinates);
+      let blocked = false;
+      for (const z of zonesArr) {
+        try {
+          if (turf.booleanPointInPolygon(destPt, turf.polygon(z.geometry.coordinates))) {
+            ship.status = 'stranded';
+            ship.speed = 0;
+            const key = `stranded:${ship.shipId}`;
+            if (!state.activeAlertKeys.has(key)) {
+              state.activeAlertKeys.add(key);
+              createAlert({
+                type: 'stranded',
+                severity: 'high',
+                shipIds: [ship.shipId],
+                message: `${ship.name} stranded — destination ${ship.destination?.portName ?? 'port'} is inside restricted zone "${z.name}"`
+              });
+            }
+            blocked = true;
+            break;
+          }
+        } catch { /* skip */ }
+      }
+      if (blocked) continue;
+    }
+
+    // Immediately try to replan
+    ship.status = 'rerouting';
+    const planned = routing.planRoute(ship);
+    if (planned.path) {
+      ship.currentPath = planned.path;
+      ship.pathIndex = 0;
+      ship.status = 'normal';
+    }
   }
 }

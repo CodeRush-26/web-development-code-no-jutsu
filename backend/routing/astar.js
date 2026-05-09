@@ -71,10 +71,9 @@ export function findPath(grid, startCell, goalCell, { allowStartUnwalkable = fal
 
   if (!allowStartUnwalkable && !isWalkable(grid, startCell.r, startCell.c)) return null;
   if (!isWalkable(grid, goalCell.r, goalCell.c)) {
-    // try snapping to nearest walkable neighbor for robustness
-    const snapped = nearestWalkable(grid, goalCell.r, goalCell.c, 8);
-    if (!snapped) return null;
-    goalCell = snapped;
+    // Goal is blocked. If it's inside a zone, return null (ship is stranded).
+    // Only snap for edge-of-map cases, not zone blocks.
+    return null;
   }
 
   const open = new PriorityQueue();

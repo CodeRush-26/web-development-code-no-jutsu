@@ -35,9 +35,12 @@ async function runTick() {
 
   // 1. advance every ship
   for (const ship of allShips) {
-    if (['arrived', 'out_of_fuel', 'stopped', 'stranded'].includes(ship.status)) continue;
+    if (['arrived', 'out_of_fuel', 'stopped'].includes(ship.status)) continue;
     advanceShip(ship, dtSec, zonesArr);
   }
+
+  // 1b. geofence check — are any ships inside zones?
+  checkGeofences(allShips, zonesArr);
 
   // 2. proximity check (15 ships → 105 pairs)
   checkProximity(allShips);
@@ -83,6 +86,30 @@ function advanceShip(ship, dtSec, zonesArr) {
 
   // ensure path exists
   if (!ship.currentPath?.length || ship.pathIndex >= ship.currentPath.length) {
+    // Check if destination itself is inside a zone (→ stranded)
+    if (ship.destination?.coordinates && zonesArr.length > 0) {
+      const destPt = turf.point(ship.destination.coordinates);
+      for (const z of zonesArr) {
+        try {
+          if (turf.booleanPointInPolygon(destPt, turf.polygon(z.geometry.coordinates))) {
+            ship.status = 'stranded';
+            ship.speed = 0;
+            const key = `stranded:${ship.shipId}`;
+            if (!state.activeAlertKeys.has(key)) {
+              state.activeAlertKeys.add(key);
+              createAlert({
+                type: 'stranded',
+                severity: 'high',
+                shipIds: [ship.shipId],
+                message: `${ship.name} stranded — destination ${ship.destination?.portName ?? 'port'} is inside restricted zone "${z.name}"`
+              });
+            }
+            return;
+          }
+        } catch { /* skip malformed zone */ }
+      }
+    }
+
     const planned = planRoute(ship);
     if (!planned.path) {
       ship.status = 'stranded';
@@ -113,7 +140,7 @@ function advanceShip(ship, dtSec, zonesArr) {
           message: `${ship.name} fuel low — may not reach destination`
         });
       }
-    } else if (ship.status !== 'distressed') {
+    } else if (ship.status !== 'distressed' && ship.status !== 'stranded') {
       ship.status = 'normal';
     }
   }
@@ -206,6 +233,40 @@ function advanceShip(ship, dtSec, zonesArr) {
   }
 
   ship.lastUpdated = new Date();
+}
+
+/**
+ * Separate geofence pass: checks ALL ships against ALL zones.
+ * Catches ships that are inside zones due to zone:create overlapping them.
+ */
+function checkGeofences(allShips, zonesArr) {
+  if (!zonesArr.length) return;
+  for (const ship of allShips) {
+    if (['arrived', 'out_of_fuel', 'stopped'].includes(ship.status)) continue;
+    const shipPt = turf.point(ship.position.coordinates);
+    for (const z of zonesArr) {
+      const zoneKey = `geofence:${ship.shipId}:${z.zoneId}`;
+      try {
+        const inside = turf.booleanPointInPolygon(shipPt, turf.polygon(z.geometry.coordinates));
+        if (inside && !state.activeAlertKeys.has(zoneKey)) {
+          state.activeAlertKeys.add(zoneKey);
+          createAlert({
+            type: 'geofence',
+            severity: 'high',
+            shipIds: [ship.shipId],
+            zoneId: z.zoneId,
+            message: `⚠ ${ship.name} inside restricted zone "${z.name}" — rerouting`
+          });
+          // Force immediate reroute out of the zone
+          ship.status = 'rerouting';
+          ship.currentPath = [];
+          ship.pathIndex = 0;
+        } else if (!inside && state.activeAlertKeys.has(zoneKey)) {
+          state.activeAlertKeys.delete(zoneKey);
+        }
+      } catch { /* skip malformed zone */ }
+    }
+  }
 }
 
 function checkProximity(allShips) {

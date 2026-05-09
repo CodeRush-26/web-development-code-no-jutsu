@@ -132,7 +132,7 @@
       "speed": 14,
       "heading": 270,
       "destination": "KWT-1",
-      "fuel": 30,
+      "fuel": 750,
       "cargo": "crude oil",
       "status": "normal"
     },
