@@ -54,7 +54,28 @@ html, body, #root {
   display: flex; align-items: center; justify-content: center;
   position: relative;
 }
-.ship-icon svg { transform: rotate(var(--rot, 0deg)); transition: transform 0.2s; }
+.ship-icon svg.ship-arrow { transform: rotate(var(--rot, 0deg)); transition: transform 0.3s ease-out; }
+.ship-weather {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  background: #f59e0b;
+  color: #0a1226;
+  border-radius: 50%;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  box-shadow: 0 0 6px rgba(245,158,11,0.6);
+  animation: weather-pulse 2s ease-in-out infinite;
+}
+@keyframes weather-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
 .ship-label {
   position: absolute;
   top: 22px;
@@ -115,4 +136,45 @@ html, body, #root {
   background-color: #142048 !important;
   border-color: #1f2c5a !important;
   filter: invert(0.92) hue-rotate(180deg) brightness(0.9);
+}
+
+/* Disconnected banner */
+.disconnect-banner {
+  background: linear-gradient(90deg, rgba(220,38,38,0.95), rgba(127,29,29,0.95));
+  border-bottom: 1px solid #b91c1c;
+  color: #fff;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slide-down 0.3s ease-out;
+}
+@keyframes slide-down {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+/* Tick pulse */
+.tick-dot {
+  width: 6px;
+  height: 6px;
+  background: #22d3ee;
+  border-radius: 50%;
+  opacity: 0.4;
+  transition: opacity 0.1s, transform 0.1s;
+}
+.tick-dot.beat {
+  opacity: 1;
+  transform: scale(1.4);
+}
+
+/* Severity flash */
+@keyframes severity-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.severity-flash-critical {
+  animation: severity-flash 1.2s ease-in-out infinite;
 }

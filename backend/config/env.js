@@ -28,7 +28,9 @@ export const env = {
   GROQ_API_KEY: required('GROQ_API_KEY'),
   GROQ_MODEL: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
 
-  TICK_MS: num('TICK_MS', 1000),
+  // Default 950ms gives ~50ms headroom under the 1Hz spec. setInterval jitter
+  // typically adds ~1-5ms — keeping us safely "1 Hz or faster".
+  TICK_MS: num('TICK_MS', 950),
   SNAPSHOT_INTERVAL_MS: num('SNAPSHOT_INTERVAL_MS', 30000),
   HISTORY_TTL_HOURS: num('HISTORY_TTL_HOURS', 1),
 

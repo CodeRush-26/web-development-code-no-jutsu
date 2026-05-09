@@ -13,6 +13,7 @@ import AIDistressAnalysis from '../components/panels/AIDistressAnalysis';
 import DirectivesPanel from '../components/panels/DirectivesPanel';
 import ShipsTable from '../components/panels/ShipsTable';
 import ZonesPanel from '../components/panels/ZonesPanel';
+import ConnectionBanner from '../components/ui/ConnectionBanner';
 import { useFleetStore } from '../store/fleetStore';
 
 export default function CommandDashboard() {
@@ -25,6 +26,7 @@ export default function CommandDashboard() {
       <Sidebar active={active} onChange={setActive} />
 
       <div className="flex-1 flex flex-col min-w-0">
+        <ConnectionBanner />
         <TopBar centerLabel="Command Center" />
 
         <main id="dashboard-main" className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">

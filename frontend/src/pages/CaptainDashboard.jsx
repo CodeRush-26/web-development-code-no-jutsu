@@ -6,6 +6,7 @@ import TopBar from '../components/topbar/TopBar';
 import FleetMap from '../components/map/FleetMap';
 import RecentAlerts from '../components/alerts/RecentAlerts';
 import AlertSound from '../components/alerts/AlertSound';
+import ConnectionBanner from '../components/ui/ConnectionBanner';
 import { useFleetStore } from '../store/fleetStore';
 import { STATUS_COLOR, STATUS_LABEL } from '../lib/config';
 import { emit } from '../lib/socket';
@@ -26,6 +27,7 @@ export default function CaptainDashboard() {
       <Sidebar active={active} onChange={setActive} />
 
       <div className="flex-1 flex flex-col min-w-0">
+        <ConnectionBanner />
         <TopBar centerLabel={`Bridge — ${shipId}`} />
 
         <main className="flex-1 overflow-y-auto p-4 space-y-4">
