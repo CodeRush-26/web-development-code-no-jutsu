@@ -1,10 +1,12 @@
 import * as turf from '@turf/turf';
 
 const CELL_SIZE_KM = 10; // ~10km cells — coarser keeps A* fast for hackathon over the whole Gulf region
+const WEATHER_COST_MULTIPLIER = 2.0; // cells with adverse weather cost 2x more to traverse
 
 /**
- * Build a walkability grid over the bounding box.
- * cell = 1 if center is inside navigablePolygon AND not inside any zone.
+ * Build a cost grid over the bounding box.
+ * cell cost: 0 = unwalkable, 1.0 = normal, >1.0 = adverse weather penalty.
+ * Weather overlay is applied via applyWeatherOverlay() after weather data arrives.
  */
 export function buildGrid(navigablePolygon, zones, cellSizeKm = CELL_SIZE_KM) {
   const bbox = turf.bbox(navigablePolygon); // [minLng, minLat, maxLng, maxLat]
@@ -21,7 +23,7 @@ export function buildGrid(navigablePolygon, zones, cellSizeKm = CELL_SIZE_KM) {
   const rows = Math.max(1, Math.ceil((maxLat - minLat) / latStep));
   const cols = Math.max(1, Math.ceil((maxLng - minLng) / lngStep));
 
-  const cells = new Uint8Array(rows * cols);
+  const cells = new Float32Array(rows * cols); // 0=blocked, 1=normal, >1=weather penalty
   const navPoly = turf.polygon(navigablePolygon.coordinates);
   const zonePolys = zones.map((z) => turf.polygon(z.geometry.coordinates));
 
@@ -40,7 +42,7 @@ export function buildGrid(navigablePolygon, zones, cellSizeKm = CELL_SIZE_KM) {
           }
         }
       }
-      cells[r * cols + c] = walkable ? 1 : 0;
+      cells[r * cols + c] = walkable ? 1.0 : 0;
     }
   }
 
@@ -58,6 +60,38 @@ export function buildGrid(navigablePolygon, zones, cellSizeKm = CELL_SIZE_KM) {
     navigablePolygon,
     zones
   };
+}
+
+/**
+ * Apply weather overlay: for each ship with adverse weather, mark cells
+ * within ~30km radius of that ship as having weather penalty cost.
+ * Called periodically when weather data refreshes.
+ */
+export function applyWeatherOverlay(grid, adverseShipPositions) {
+  // Reset all walkable cells to base cost 1.0
+  for (let i = 0; i < grid.cells.length; i++) {
+    if (grid.cells[i] > 0) grid.cells[i] = 1.0;
+  }
+
+  // For each adverse weather position, penalize nearby cells
+  const radiusCells = Math.ceil(30 / grid.cellSizeKm); // ~30km weather radius
+  for (const [lng, lat] of adverseShipPositions) {
+    const centerC = Math.floor((lng - grid.minLng) / grid.lngStep);
+    const centerR = Math.floor((lat - grid.minLat) / grid.latStep);
+
+    for (let dr = -radiusCells; dr <= radiusCells; dr++) {
+      for (let dc = -radiusCells; dc <= radiusCells; dc++) {
+        if (dr * dr + dc * dc > radiusCells * radiusCells) continue; // circular
+        const r = centerR + dr;
+        const c = centerC + dc;
+        if (r < 0 || r >= grid.rows || c < 0 || c >= grid.cols) continue;
+        const idx = r * grid.cols + c;
+        if (grid.cells[idx] > 0) {
+          grid.cells[idx] = Math.max(grid.cells[idx], WEATHER_COST_MULTIPLIER);
+        }
+      }
+    }
+  }
 }
 
 export function rebuildForZones(grid, zones) {
@@ -79,5 +113,14 @@ export function cellToLngLat(grid, r, c) {
 
 export function isWalkable(grid, r, c) {
   if (r < 0 || r >= grid.rows || c < 0 || c >= grid.cols) return false;
-  return grid.cells[r * grid.cols + c] === 1;
+  return grid.cells[r * grid.cols + c] > 0;
+}
+
+/**
+ * Get the traversal cost of a cell. Returns 0 for unwalkable, 1.0 for normal,
+ * >1.0 for weather-penalized cells.
+ */
+export function cellCost(grid, r, c) {
+  if (r < 0 || r >= grid.rows || c < 0 || c >= grid.cols) return 0;
+  return grid.cells[r * grid.cols + c];
 }
