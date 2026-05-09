@@ -156,9 +156,9 @@ function advanceShip(ship, dtSec, zonesArr) {
       state.activeAlertKeys.add(key);
       createAlert({
         type: 'out_of_fuel',
-        severity: 'high',
+        severity: 'critical',
         shipIds: [ship.shipId],
-        message: `${ship.name} out of fuel — vessel adrift`
+        message: `🚨 CRITICAL: ${ship.name} out of fuel — vessel adrift at [${ship.position.coordinates[1].toFixed(3)}°N, ${ship.position.coordinates[0].toFixed(3)}°E]`
       });
     }
     return;
